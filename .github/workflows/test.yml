@@ -5,7 +5,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, macos-12, osx-arm64]
+        runtime: [ ubuntu-20.04, ubuntu-22.04, macos-12-x64, macos-12-arm ]
+        include:
+        - runtime: ubuntu-20.04
+          os: ubuntu-20.04
+          architecture: x64
+
+        - runtime: ubuntu-22.04
+          os: ubuntu-22.04
+          architecture: x64
+
+        - runtime: macos-12-x64
+          os: macos-12
+          architecture: x64
+
+        - runtime: macos-12-arm
+          os: macos-12
+          architecture: arm64
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
