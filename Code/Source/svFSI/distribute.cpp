@@ -47,7 +47,7 @@ void distribute(Simulation* simulation)
     cm.bcast(cm_mod, chnl_mod.appPath);
     #ifdef debug_distribute
     dmsg << " chnl_mod.pClr: " << chnl_mod.pClr;
-    dmsg << " chnl_mod.appPath.pClr: " << chnl_mod.appPath;
+    dmsg << " chnl_mod.appPath: " << chnl_mod.appPath;
     #endif
 
     //[TODO:Davep] add this?
@@ -64,13 +64,19 @@ void distribute(Simulation* simulation)
 
   if (cm.slv(cm_mod)) {
     com_mod.msh.resize(com_mod.nMsh);
+    #ifdef debug_distribute
+    dmsg << "slave process " << "";
+    #endif
+  } else {
+    #ifdef debug_distribute
+    dmsg << "master process " << "";
+    #endif
   }
 
   #ifdef debug_distribute
-  dmsg << " com_mod.nMsh: " << com_mod.nMsh;
-  dmsg << " com_mod.gtnNo: " << com_mod.gtnNo;
-  dmsg << " com_mod.nsd: " << com_mod.nsd;
-  dmsg << " com_mod.rmsh.isReqd: " << com_mod.rmsh.isReqd;
+  dmsg << "nMsh: " << com_mod.nMsh;
+  dmsg << "gtnNo: " << com_mod.gtnNo;
+  dmsg << "nsd: " << com_mod.nsd;
   #endif
 
   // wgt and wrk are the assigned portion of each mesh to the each
@@ -81,24 +87,25 @@ void distribute(Simulation* simulation)
   Array<double> wgt(nMsh, num_proc); 
   Vector<double> wrk(nMsh); 
 
-  #ifdef debug_distribute
-  dmsg << "num_proc: " << num_proc ;
-  dmsg << "com_mod.gtnNo: " << com_mod.gtnNo;
-  dmsg << "com_mod.nMsh: " << com_mod.nMsh;
-  #endif
-
   // Here is rough estimation of how each mesh should be splited
   // between processors
   // 
   //wrk = REAL(msh%gnNo, KIND=RKIND)/REAL(gtnNo, KIND=RKIND)
   //
+  #ifdef debug_distribute
+  dmsg << "Rough estimation of how each mesh split ..." << " ";
+  #endif
+
   for (int i = 0; i < com_mod.msh.size(); i++) {
     wrk[i] = static_cast<double>(com_mod.msh[i].gnNo) / com_mod.gtnNo;
     #ifdef debug_distribute
-    dmsg << "----- i " << i << " -----";
-    dmsg << "com_mod.msh[i].gnNo: " << com_mod.msh[i].gnNo;
-    dmsg << "com_mod.msh[i].name: " << com_mod.msh[i].name;
-    dmsg << "wrk[" << i << "]: " << wrk[i];
+    dmsg << "---------- i " << i;
+    dmsg << "msh[i].name: " << com_mod.msh[i].name;
+    dmsg << "msh[i].gnNo: " << com_mod.msh[i].gnNo;
+    dmsg << "com_mod.gtnNo: " << com_mod.gtnNo;
+    dmsg << "msh[i].nNo: " << com_mod.msh[i].nNo;
+    dmsg << "msh[i].msh.nEl: " << com_mod.msh[i].nEl;
+    dmsg << "wrk[i]: "  << wrk[i];
     #endif
   }
 
@@ -107,9 +114,19 @@ void distribute(Simulation* simulation)
   int task_id = com_mod.cm.idcm();
   all_fun::split_jobs(task_id, nMsh, num_proc, wgt, wrk);
 
+  #ifdef debug_distribute
+  dmsg << " "  << " ";
+  dmsg << "Split jobs .. "  << " ";
+  dmsg << "wrk: "  << wrk;
+  dmsg << "wgt: "  << wgt;
+  #endif
+
   // First partitioning the meshes
   // gmtl:  gtnNo --> tnNo
   //
+  #ifdef debug_distribute
+  dmsg << "Partition meshes " << " ...";
+  #endif
   com_mod.tnNo = 0;
 
   if (cm.seq()) {
@@ -125,28 +142,43 @@ void distribute(Simulation* simulation)
   Vector<float> iWgt(num_proc); 
 
   #ifdef debug_distribute
-  dmsg << "wgt: ";
-  for (int iM = 0; iM < nMsh; iM++) {
-    for (int i = 0; i < num_proc; i++) {
-      dmsg << "d wgt[" << iM << "," << i << "]:"  << wgt(iM,i);
-    }
-  }
+  dmsg << "          " << " ";
+  dmsg << "wgt: " << wgt;
   #endif
 
   for (int iM = 0; iM < nMsh; iM++) {
+    #ifdef debug_distribute
+    dmsg << "          " << " ";
+    dmsg << "Partitioning mesh: " << iM;
+    #endif
     auto sum = wgt.sum_row(iM);
     for (int i = 0; i < num_proc; i++) {
       iWgt[i] = wgt(iM,i) / sum;
     }
-    part_msh(simulation, com_mod.msh[iM], gmtl, num_proc, iWgt);
+    #ifdef debug_distribute
+    dmsg << "iWgt: " << iWgt;
+    #endif
+    part_msh(simulation, iM, com_mod.msh[iM], gmtl, num_proc, iWgt);
   }
 
   // Setting gtl pointer in case that it is needed and mapping IEN.
   //
   int tnNo = com_mod.tnNo;
+  #ifdef debug_distribute
+  dmsg << " " << " ";
+  dmsg << "Setting gtl pointer " << " ...";
+  dmsg << "tnNo: " << tnNo;
+  #endif
+
   for (int iM = 0; iM < nMsh; iM++) {
     auto& msh = com_mod.msh[iM];
     msh.lN.resize(tnNo);
+    #ifdef debug_distribute
+    dmsg << "---------- iM " << iM;
+    dmsg << "msh.gnNo: " << msh.gnNo;
+    dmsg << "msh.nNo: " << msh.nNo;
+    dmsg << "msh.nEl: " << msh.nEl;
+    #endif
 
     for (int a = 0; a < msh.nNo; a++) {
       int Ac = msh.gN[a];
@@ -208,6 +240,10 @@ void distribute(Simulation* simulation)
   //
   // tMs is a temporary variable to keep fa%gN of the old meshes.
   //
+  #ifdef debug_distribute
+  dmsg << " " << " ";
+  dmsg << "Partitioning the faces" << " ...";
+  #endif
   std::vector<mshType> tMs(nMsh);
 
   for (int iM = 0; iM < nMsh; iM++) {
@@ -219,6 +255,11 @@ void distribute(Simulation* simulation)
       part_face(simulation, msh, face, tMs[iM].fa[iFa], gmtl);
     }
   }
+
+  #ifdef debug_distribute
+  dmsg << " " << " ";
+  dmsg << "Sending data read by master to slaves " << " ...";
+  #endif
 
   if (!com_mod.resetSim) {
     cm.bcast(cm_mod, &com_mod.nsymd);
@@ -255,7 +296,7 @@ void distribute(Simulation* simulation)
 
     if (com_mod.rmsh.isReqd) {
       auto& rmsh = com_mod.rmsh;
-      cm.bcast(cm_mod, &rmsh.method);
+      cm.bcast_enum(cm_mod, &rmsh.method);
       cm.bcast(cm_mod, &rmsh.freq);
       cm.bcast(cm_mod, &rmsh.cpVar);
 
@@ -271,7 +312,7 @@ void distribute(Simulation* simulation)
     cm.bcast(cm_mod, &com_mod.iCntct);
 
     if (com_mod.iCntct) {
-      cm.bcast(cm_mod, &com_mod.cntctM.cType);
+      cm.bcast_enum(cm_mod, &com_mod.cntctM.cType);
       cm.bcast(cm_mod, &com_mod.cntctM.k);
       cm.bcast(cm_mod, &com_mod.cntctM.c);
       cm.bcast(cm_mod, &com_mod.cntctM.h);
@@ -284,6 +325,10 @@ void distribute(Simulation* simulation)
 
   // Distributing X to processors
   //
+  #ifdef debug_distribute
+  dmsg << " " << " ";
+  dmsg << "Distributing X to processors " << " ...";
+  #endif
   Array<double> tmpX;
 
   if (cm.mas(cm_mod)) {
@@ -300,8 +345,15 @@ void distribute(Simulation* simulation)
   bool flag = (com_mod.dmnId.size() != 0);
   cm.bcast(cm_mod, &flag);
   Vector<int> part;
+  #ifdef debug_distribute
+  dmsg << "dmnId.size(): " << com_mod.dmnId.size();
+  dmsg << "flag: " << flag;
+  #endif
 
   if (flag) {
+  #ifdef debug_distribute
+    dmsg << "Distributing dmnId " << " ... ";
+  #endif
     if (cm.mas(cm_mod)) {
       part.resize(com_mod.gtnNo);
       part = com_mod.dmnId;
@@ -962,7 +1014,13 @@ void dist_eq(ComMod& com_mod, const CmMod& cm_mod, const cmType& cm, const std::
         cm.bcast(cm_mod, &cep.odes.maxItr);
         cm.bcast(cm_mod, &cep.odes.absTol);
         cm.bcast(cm_mod, &cep.odes.relTol);
-      } 
+      }
+
+      cm.bcast(cm_mod, &cep_mod.ttp.G_Na);
+      cm.bcast(cm_mod, &cep_mod.ttp.G_CaL);
+      cm.bcast(cm_mod, &cep_mod.ttp.G_Kr);
+      cm.bcast(cm_mod, cep_mod.ttp.G_Ks);
+      cm.bcast(cm_mod, cep_mod.ttp.G_to);
     } 
 
     if ((dmn.phys == EquationType::phys_struct) || (dmn.phys == EquationType::phys_ustruct)) {
@@ -997,6 +1055,27 @@ void dist_eq(ComMod& com_mod, const CmMod& cm_mod, const cmType& cm, const std::
       dist_mat_consts(com_mod, cm_mod, cm, dmnIB.stM);
     }
   } 
+
+  // Distribute ECG leads parameters
+  //
+  cm.bcast(cm_mod, &cep_mod.ecgleads.num_leads);
+  #ifdef dist_eq
+  dmsg << "cep_mod.ecgleads.num_leads: " << cep_mod.ecgleads.num_leads;
+  #endif
+
+  if (cep_mod.ecgleads.num_leads != 0) {
+    if (!cm.mas(cm_mod)) {
+      cep_mod.ecgleads.x_coords.resize(cep_mod.ecgleads.num_leads);
+      cep_mod.ecgleads.y_coords.resize(cep_mod.ecgleads.num_leads);
+      cep_mod.ecgleads.z_coords.resize(cep_mod.ecgleads.num_leads);
+      cep_mod.ecgleads.pseudo_ECG.resize(cep_mod.ecgleads.num_leads);
+    }
+
+    cm.bcast(cm_mod, cep_mod.ecgleads.x_coords);
+    cm.bcast(cm_mod, cep_mod.ecgleads.y_coords);
+    cm.bcast(cm_mod, cep_mod.ecgleads.z_coords);
+    cm.bcast(cm_mod, cep_mod.ecgleads.pseudo_ECG);
+  }
 
   // Distribute output parameters
   //
@@ -1072,6 +1151,11 @@ void dist_mat_consts(const ComMod& com_mod, const CmMod& cm_mod, const cmType& c
   cm.bcast(cm_mod, &lStM.afs);
   cm.bcast(cm_mod, &lStM.bfs);
   cm.bcast(cm_mod, &lStM.kap);
+  cm.bcast(cm_mod, &lStM.khs);
+  cm.bcast(cm_mod, &lStM.a0);
+  cm.bcast(cm_mod, &lStM.b1);
+  cm.bcast(cm_mod, &lStM.b2);
+  cm.bcast(cm_mod, &lStM.mu0);
 
   // Distribute fiber stress
   cm.bcast(cm_mod, &lStM.Tf.fType);
@@ -1140,7 +1224,6 @@ void part_face(Simulation* simulation, mshType& lM, faceType& lFa, faceType& gFa
 
   // Broadcasting the number of nodes and elements of to slaves and
   // populating gFa to all procs
-
   if (cm.mas(cm_mod)) {
     gFa.d = lFa.d;
     gFa.eNoN = lFa.eNoN;
@@ -1148,6 +1231,7 @@ void part_face(Simulation* simulation, mshType& lM, faceType& lFa, faceType& gFa
     gFa.nEl = lFa.nEl;
     gFa.gnEl = lFa.gnEl;
     gFa.nNo = lFa.nNo;
+    gFa.qmTRI3 = lFa.qmTRI3;
 
     if (com_mod.rmsh.isReqd) {
       gFa.gebc.resize(1+gFa.eNoN, gFa.gnEl);
@@ -1157,6 +1241,7 @@ void part_face(Simulation* simulation, mshType& lM, faceType& lFa, faceType& gFa
       //ALLOCATE(gFa%gebc(0,0))
     }
   }
+  cm.bcast(cm_mod, &lFa.qmTRI3);
 
   cm.bcast(cm_mod, &gFa.d);
   cm.bcast(cm_mod, &gFa.eNoN);
@@ -1164,6 +1249,7 @@ void part_face(Simulation* simulation, mshType& lM, faceType& lFa, faceType& gFa
   cm.bcast(cm_mod, &gFa.nEl);
   cm.bcast(cm_mod, &gFa.gnEl);
   cm.bcast(cm_mod, &gFa.nNo);
+  cm.bcast(cm_mod, &gFa.qmTRI3);
 
   #ifdef debug_part_face
   dmsg << "gFa.d: " << gFa.d;
@@ -1172,6 +1258,7 @@ void part_face(Simulation* simulation, mshType& lM, faceType& lFa, faceType& gFa
   dmsg << "gFa.nEl: " << gFa.nEl;
   dmsg << "gFa.gnEl: " << gFa.gnEl;
   dmsg << "gFa.nNo: " << gFa.nNo;
+  dmsg << "gFa.qmTRI3: " << gFa.qmTRI3;
   #endif
 
   // Set face properties for the input element type.
@@ -1323,7 +1410,7 @@ void part_face(Simulation* simulation, mshType& lM, faceType& lFa, faceType& gFa
 //----------
 // Reproduces the Fortran 'PARTMSH' subroutine.
 //
-void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Vector<float>& wgt)
+void part_msh(Simulation* simulation, int iM, mshType& lM, Vector<int>& gmtl, int nP, Vector<float>& wgt)
 {
   auto& cm_mod = simulation->cm_mod;
   auto& com_mod = simulation->com_mod;
@@ -1332,7 +1419,7 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   int num_proc = cm.np();
   int task_id = cm.idcm();
 
-  #define ndbg_part_msh
+  #define n_dbg_part_msh
   #ifdef dbg_part_msh
   DebugMsg dmsg(__func__, com_mod.cm.idcm());
   dmsg.banner();
@@ -1379,6 +1466,7 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   cm.bcast(cm_mod, lM.name);
   cm.bcast(cm_mod, &lM.nFn);
   cm.bcast(cm_mod, &lM.scF);
+  cm.bcast(cm_mod, &lM.qmTET4);
 
   // Number of fibers.
   int nFn = lM.nFn;
@@ -1395,8 +1483,13 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
 
   int eNoN = lM.eNoN;
 
+  #ifdef dbg_part_msh
+  dmsg << "lM.gnEl: " << lM.gnEl;
+  dmsg << "lM.gnNo: " << lM.gnNo;
+  #endif
+
   if (cm.slv(cm_mod)) {
-    nn::select_ele(simulation, lM);
+    nn::select_ele(com_mod, lM);
     lM.gIEN.clear(); 
     lM.fa.resize(lM.nFa);
   }
@@ -1448,13 +1541,18 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   }
 
   lM.eDist[num_proc] = lM.gnEl;
+  #ifdef dbg_part_msh
+  dmsg << "wgt: " << wgt; 
+  dmsg << "lM.eDist: " << lM.eDist;
+  #endif
 
   for (int i = 0; i < num_proc; i++) { 
     disp[i] = lM.eDist[i] * eNoN;
     sCount[i] = lM.eDist[i+1] * eNoN - disp[i];
     #ifdef dbg_part_msh
-    dmsg << "disp[" << i << "]: " << disp[i];
-    dmsg << "sCount[" << i << "]: " << sCount[i];
+    dmsg << ">>>> i: " << i;
+    dmsg << "disp[i]: " << disp[i];
+    dmsg << "sCount[i]: " << sCount[i];
     #endif
   }
 
@@ -1470,35 +1568,67 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
 
   Vector<int> part(nEl);
 
-  std::string fTmp = chnl_mod.appPath + ".partitioning_" + lM.name + ".bin";
+  std::string fTmp = chnl_mod.appPath + "partitioning_" + lM.name + "_cpp.bin";
   bool flag = false;
+  FILE *fp = nullptr; 
+  if (com_mod.rmsh.isReqd) { 
+    fp = fopen(fTmp.c_str(), "r");
+    if (FILE *fp = fopen(fTmp.c_str(), "r")) {
+      flag = true;
+      fclose(fp);
+    }
+  }
   //IF (rmsh%isReqd) INQUIRE(FILE=TRIM(fTmp), EXIST=flag)
   #ifdef dbg_part_msh
-  dmsg;
+  dmsg << " " << " ";
+  dmsg << "rmsh.isReqd: " << com_mod.rmsh.isReqd;
   dmsg << "fTmp: " << fTmp;
+  dmsg << "flag: " << flag;
+  dmsg << "com_mod.resetSim: " << com_mod.resetSim;
+  dmsg << "fp: " << fp;
+  if (fp) fclose(fp);
   #endif
 
   if (lM.eType == consts::ElementType::NRB) {
     part = cm.id();
-  } else if (flag && !com_mod.resetSim) {
+
+  // [TODO:DaveP] Reading partition data does not seem to work.
+  //
+  } else if (false) { 
+  //} else if (flag && !com_mod.resetSim) {
+    #ifdef dbg_part_msh
+    dmsg << " " << " ";
+    dmsg << "Reading partition data from file " << fTmp;
+    #endif
     MPI_File fid;
     MPI_File_open(cm.com(), fTmp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fid);
     MPI_File_set_view(fid, idisp, cm_mod::mpint, cm_mod::mpint, "native", MPI_INFO_NULL);
     MPI_File_read(fid, part.data(), nEl, cm_mod::mpint, MPI_STATUS_IGNORE);
     MPI_File_close(&fid);
+    #ifdef dbg_part_msh
+    dmsg << "  nEl: " << nEl;
+    dmsg << "  idisp: " << idisp;
+    //if (cm.mas(cm_mod)) {
+    //dmsg << "  part = " << part;
+    //}
+    dmsg << "---------- " << "---------- ";
+    #endif
 
   // Scattering the lM.gIEN array to all processors.
   //
   } else { 
+    #ifdef dbg_part_msh
+    dmsg << " " << " ";
+    dmsg << " " << " ";
+    dmsg << "Scattering the lM%gIEN array to processors " << " ... ";
+    #endif
     lM.IEN.resize(eNoN, nEl);
 
     // Send lM.gIEN array to all processor's lM.IEN[] array of siize nEl*eNoN.
     //
     #ifdef dbg_part_msh
-    dmsg << "** sCount[0]: " << sCount[0];
-    dmsg << "** sCount[1]: " << sCount[1];
-    dmsg << "** disp[0]: " << disp[0];
-    dmsg << "** disp[1]: " << disp[1];
+    dmsg << "sCount: " << sCount;
+    dmsg << "disp: " << disp;
     #endif
 
     MPI_Scatterv(lM.gIEN.data(), sCount.data(), disp.data(), cm_mod::mpint, lM.IEN.data(), 
@@ -1506,7 +1636,9 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
 
     int eNoNb = consts::element_type_to_elem_nonb.at(lM.eType);
     #ifdef dbg_part_msh
+    dmsg << "nEl: " << nEl;
     dmsg << "eNoNb: " << eNoNb;
+    dmsg << "lM.IEN.size(): " << lM.IEN.size();
     #endif
 
     // The output of this process is "part" array which part(i) says
@@ -1520,18 +1652,29 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
 
     if (edgecut == 0) {
       #ifdef dbg_part_msh
-      dmsg << "ParMETIS failed to partition the mesh";
+      dmsg << "ParMETIS failed to partition the mesh" << " ...";
       #endif
       part = cm.id();
     } else if (edgecut > 0) {
       #ifdef dbg_part_msh
-      dmsg << "ParMETIS partitioned the mesh by cutting " << edgecut << " elements.";
+      dmsg << "ParMETIS partitioned the mesh by cutting: " << std::to_string(edgecut) + " elements.";
       #endif
     } 
 
     lM.IEN.clear();
 
     if (com_mod.rmsh.isReqd) {
+      #ifdef dbg_part_msh
+      dmsg << "---------------------------" << "------ ";
+      dmsg << "Writing partition data to file: " << fTmp;
+      dmsg << "  nEl: " << nEl;
+      dmsg << "  idisp: " << idisp;
+      dmsg << "  idisp: " << idisp;
+      //if (cm.mas(cm_mod)) {
+      //dmsg << "  part = " << part;
+      //}
+      dmsg << "---------------------------" << "------ ";
+      #endif
       MPI_File fid;
       MPI_File_open(cm.com(), fTmp.c_str(), MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, &fid);
       MPI_File_set_view(fid, idisp, cm_mod::mpint, cm_mod::mpint, "native", MPI_INFO_NULL);
@@ -1561,21 +1704,20 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   MPI_Gatherv(part.data(), nEl, cm_mod::mpint, gPart.data(), sCount.data(), disp.data(), 
       cm_mod::mpint, cm_mod.master, cm.com());
 
-  #ifdef dbg_part_msh
-  for (int e = 0; e < lM.gnEl; e++) {
-    //dmsg << "gPart[[" << e << "]: " << gPart[e];
-  }
-  for (int i = 0; i < num_proc; i++) { 
-    dmsg << "*** sCount[i]: " << sCount[i];
-  }
-  #endif
-
   part.clear();
 
   Array<int> tempIEN;
   Array<double> tmpFn;
   flag = false;
   bool fnFlag = false;
+
+  #ifdef dbg_part_msh
+  dmsg << "sCount: " << sCount;
+  dmsg << "disp: " << disp;
+  //dmsg << "gPart: " << gPart;
+  dmsg << " " << " ";
+  dmsg << "Making the lM%IEN array " << " ...";
+  #endif
  
   if (cm.mas(cm_mod)) {
     sCount = 0;
@@ -1587,6 +1729,11 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
       lM.eDist[i+1] = lM.eDist[i] + sCount[i];
     }
 
+    #ifdef dbg_part_msh
+    dmsg << "lM.eDist: " << lM.eDist;
+    dmsg << "sCount: " << sCount;
+    #endif
+
     tempIEN.resize(eNoN,lM.gnEl); 
     lM.otnIEN.resize(lM.gnEl);
 
@@ -1594,6 +1741,7 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
     // master. lM%otnIEN maps old IEN order to new IEN order.
     //
     disp = 0;
+
     for (int e = 0; e < lM.gnEl; e++) { 
       int Ec = lM.eDist[gPart[e]];
       lM.eDist[gPart[e]] = Ec + 1;
@@ -1606,6 +1754,9 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
     for (int i = 0; i < num_proc; i++) { 
       lM.eDist[i+1] = lM.eDist[i] + sCount[i];
     }
+    #ifdef dbg_part_msh
+    dmsg << "2 lM.eDist: " << lM.eDist;
+    #endif
 
     // This it to distribute eId, if allocated
     //
@@ -1642,7 +1793,9 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
 
   nEl = lM.eDist[cm.id()+1] - lM.eDist[cm.id()];
   #ifdef dbg_part_msh
-  dmsg << "nEl: " << nEl;
+  dmsg << "flag: " << flag;
+  dmsg << "fnFlag: " << fnFlag;
+  dmsg << "3 lM.eDist: " << lM.eDist;
   #endif
   lM.nEl = nEl;
   lM.IEN.resize(eNoN,nEl); 
@@ -1669,7 +1822,7 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   //
   if (fnFlag) { 
     #ifdef dbg_part_msh
-    dmsg << "Communicating fN ...";
+    dmsg << "Communicating fN " << " ...";
     dmsg << "nFn: " << nFn;
     dmsg << "nsd: " << nsd;
     dmsg << "nEl: " << nEl;
@@ -1691,8 +1844,8 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   // Now scattering the sorted lM%IEN to all processors.
   //
   #ifdef dbg_part_msh
-  dmsg;
-  dmsg << "Now scattering the sorted lM%IEN to all processors ...";
+  dmsg << " " << " ";
+  dmsg << "Now scattering the sorted lM%IEN to all processors " << " ...";
   #endif
   if (tempIEN.size() == 0) {
     tempIEN.clear();
@@ -1713,8 +1866,8 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   // lM%IEN: eNoN,nEl --> nNo
   //
   #ifdef dbg_part_msh
-  dmsg;
-  dmsg << "Constructing the initial global to local pointer ...";
+  dmsg << " " << " ";
+  dmsg << "Constructing the initial global to local pointer " << " ...";
   dmsg << "lM.gnNo: " << lM.gnNo;
   #endif
 
@@ -1736,6 +1889,7 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   #ifdef dbg_part_msh
   dmsg << "nNo: " << nNo;
   #endif
+
   lM.nNo = nNo;
   if (cm.slv(cm_mod)) {
     lM.gN.resize(lM.gnNo);
@@ -1752,6 +1906,14 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
     }
   }
 
+  #ifdef dbg_part_msh
+  dmsg << "---------- partitioned mesh " << std::to_string(iM) + " ----------";
+  dmsg << "lM.nNo: " << lM.nNo;
+  dmsg << "lM.gnNo: " << lM.gnNo;
+  dmsg << "lM.nEl: " << lM.nEl;
+  dmsg << "lM.gnEl: " << lM.gnEl;
+  #endif
+
   // mapping and converting other parameters.
   // I will use an upper bound for gPart as a container for ltg,
   // since there can be repeated nodes. gPart is just a temp variable.
@@ -1761,8 +1923,8 @@ void part_msh(Simulation* simulation, mshType& lM, Vector<int>& gmtl, int nP, Ve
   // lM%gN: nNo   --> tnNo
   //
   #ifdef dbg_part_msh
-  dmsg << "Mapping and converting other parameters ... ";
-  dmsg << "* com_mod.tnNo: " << com_mod.tnNo;
+  dmsg << "Mapping and converting other parameters " << " ... ";
+  dmsg << "com_mod.tnNo: " << com_mod.tnNo;
   #endif
 
   lM.gN.clear();

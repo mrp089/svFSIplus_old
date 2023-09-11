@@ -6,6 +6,7 @@
 #include <float.h>
 #include <iostream>
 #include <string>
+#include <vector>
 
 std::string build_file_prefix(const std::string& label);
 
@@ -25,7 +26,7 @@ class Vector
     static int active;
     static double memory_in_use;
     static double memory_returned;
-    static bool write_disabled;
+    static bool write_enabled;
     static void memory(const std::string& prefix="");
     static void stats(const std::string& prefix="");
 
@@ -191,6 +192,16 @@ class Vector
       std::copy(values.begin(), values.end(), data_);
     }
 
+    void set_values(std::vector<T> values)
+    {
+      if (values.size() == 0) {
+        return;
+      }
+      check_type();
+      allocate(values.size());
+      std::copy(values.begin(), values.end(), data_);
+    }
+
     //------
     // read
     //------
@@ -209,7 +220,7 @@ class Vector
     //
     void write(const std::string& label, const T offset={}) const
     {
-      if (write_disabled) {
+      if (!write_enabled) {
         return;
       }
 
@@ -488,11 +499,21 @@ class Vector
 
     T min() const
     {
+      /*
+      if (size_ == 0) {
+        return std::numeric_limits<T>::max();
+      }
+      */
       return *std::min_element((*this).begin(), (*this).end());
     }
 
     T max() const
     {
+      /*
+      if (size_ == 0) {
+        return -std::numeric_limits<T>::max();
+      }
+      */
       return *std::max_element((*this).begin(), (*this).end());
     }
 
@@ -573,8 +594,11 @@ class Vector
     void check_index(const int i) const
     {
       if (data_ == nullptr) {
-        throw std::runtime_error(+"Accessing null data in Vector.");
+        std::cout << "[Vector] WARNING: Accessing null data in Vector at " << i << std::endl;
+        return;
+        //throw std::runtime_error(+"Accessing null data in Vector.");
       }
+
       if ((i < 0) || (i >= size_)) {
         auto index_str = std::to_string(i);
         auto dims = std::to_string(size_);

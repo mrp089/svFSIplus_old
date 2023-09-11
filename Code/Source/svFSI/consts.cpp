@@ -75,6 +75,14 @@ const std::map<std::string,ConstitutiveModelType> constitutive_model_name_to_typ
 
 };
 
+// Map for contact model string name to ContacteModelType.
+const std::map<std::string,ContactModelType> contact_model_name_to_type =
+{
+  {"penalty", ContactModelType::cntctM_penalty},
+  {"potential", ContactModelType::cntctM_potential},
+};
+
+
 //------------------------------------
 // fluid_viscosity_model_name_to_type
 //------------------------------------
@@ -174,6 +182,11 @@ const std::map<std::string,EquationType> equation_name_to_type = {
     {"ustruct", EquationType::phys_ustruct},
 
   };
+
+const std::map<std::string,MeshGeneratorType> mesh_generator_name_to_type = {
+    {"Tetgen", MeshGeneratorType::RMSH_TETGEN},
+    {"Meshsim", MeshGeneratorType::RMSH_MESHSIM}
+};
 
 //-----------------------------
 // preconditioner_name_to_type

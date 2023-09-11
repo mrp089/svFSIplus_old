@@ -297,10 +297,11 @@ SetEquationPropertiesMapType set_equation_props = {
   propL[1][n] = PhysicalProperyType::elasticity_modulus;
   propL[2][n] = PhysicalProperyType::poisson_ratio;
   propL[3][n] = PhysicalProperyType::damping;
-  propL[4][n] = PhysicalProperyType::f_x;
-  propL[5][n] = PhysicalProperyType::f_y;
+  propL[4][n] = PhysicalProperyType::solid_viscosity;
+  propL[5][n] = PhysicalProperyType::f_x;
+  propL[6][n] = PhysicalProperyType::f_y;
   if (simulation->com_mod.nsd == 3) {
-    propL[6][n] = PhysicalProperyType::f_z;
+    propL[7][n] = PhysicalProperyType::f_z;
   }
 
   // Set ustruct properties.
@@ -308,12 +309,13 @@ SetEquationPropertiesMapType set_equation_props = {
   propL[0][n] = PhysicalProperyType::solid_density;
   propL[1][n] = PhysicalProperyType::elasticity_modulus;
   propL[2][n] = PhysicalProperyType::poisson_ratio;
-  propL[3][n] = PhysicalProperyType::ctau_M;
-  propL[4][n] = PhysicalProperyType::ctau_C;
-  propL[5][n] = PhysicalProperyType::f_x;
-  propL[6][n] = PhysicalProperyType::f_y;
+  propL[3][n] = PhysicalProperyType::solid_viscosity;
+  propL[4][n] = PhysicalProperyType::ctau_M;
+  propL[5][n] = PhysicalProperyType::ctau_C;
+  propL[6][n] = PhysicalProperyType::f_x;
+  propL[7][n] = PhysicalProperyType::f_y;
   if (simulation->com_mod.nsd == 3) {
-    propL[7][n] = PhysicalProperyType::f_z;
+    propL[8][n] = PhysicalProperyType::f_z;
   }
 
   // Set lElas properties.
@@ -362,7 +364,7 @@ SetEquationPropertiesMapType set_equation_props = {
   read_ls(simulation, eq_params, SolverType::lSolver_GMRES, lEq);
 
   if (com_mod.rmsh.isReqd && !com_mod.resetSim) {
-    read_rmsh(simulation);
+    read_rmsh(simulation, eq_params);
   }
 
 } },
@@ -453,6 +455,7 @@ SetEquationPropertiesMapType set_equation_props = {
   using namespace consts;
   auto& com_mod = simulation->get_com_mod();
   lEq.phys = consts::EquationType::phys_shell;
+  com_mod.shlEq = true;
   
   propL[0][0] = PhysicalProperyType::solid_density;
   propL[1][0] = PhysicalProperyType::damping;
@@ -465,8 +468,18 @@ SetEquationPropertiesMapType set_equation_props = {
   
   read_domain(simulation, eq_params, lEq, propL);
   
-  nDOP = {3,1,1,0};
-  outPuts = {OutputType::out_displacement, OutputType::out_velocity, OutputType::out_integ};
+  nDOP = {9,1,0,0};
+  outPuts = {
+    OutputType::out_displacement, 
+    OutputType::out_stress, 
+    OutputType::out_strain, 
+    OutputType::out_jacobian, 
+    OutputType::out_defGrad, 
+    OutputType::out_velocity, 
+    OutputType::out_integ,
+    OutputType::out_CGstrain,
+    OutputType::out_CGInv1
+  };
 
   // Set solver parameters.
   read_ls(simulation, eq_params, SolverType::lSolver_CG, lEq);
@@ -524,10 +537,11 @@ SetEquationPropertiesMapType set_equation_props = {
   propL[1][0] = PhysicalProperyType::damping;
   propL[2][0] = PhysicalProperyType::elasticity_modulus;
   propL[3][0] = PhysicalProperyType::poisson_ratio;
-  propL[4][0] = PhysicalProperyType::f_x;
-  propL[5][0] = PhysicalProperyType::f_y;
+  propL[4][0] = PhysicalProperyType::solid_viscosity;
+  propL[5][0] = PhysicalProperyType::f_x;
+  propL[6][0] = PhysicalProperyType::f_y;
   if (simulation->com_mod.nsd == 3) {
-    propL[6][0] = PhysicalProperyType::f_z;
+    propL[7][0] = PhysicalProperyType::f_z;
   }
 
   read_domain(simulation, eq_params, lEq, propL);
@@ -567,12 +581,13 @@ SetEquationPropertiesMapType set_equation_props = {
   propL[0][0] = PhysicalProperyType::solid_density;
   propL[1][0] = PhysicalProperyType::elasticity_modulus;
   propL[2][0] = PhysicalProperyType::poisson_ratio;
-  propL[3][0] = PhysicalProperyType::ctau_M;
-  propL[4][0] = PhysicalProperyType::ctau_C;
-  propL[5][0] = PhysicalProperyType::f_x;
-  propL[6][0] = PhysicalProperyType::f_y;
+  propL[3][0] = PhysicalProperyType::solid_viscosity;
+  propL[4][0] = PhysicalProperyType::ctau_M;
+  propL[5][0] = PhysicalProperyType::ctau_C;
+  propL[6][0] = PhysicalProperyType::f_x;
+  propL[7][0] = PhysicalProperyType::f_y;
   if (simulation->com_mod.nsd == 3) {
-    propL[7][0] = PhysicalProperyType::f_z;
+    propL[8][0] = PhysicalProperyType::f_z;
   }
 
   read_domain(simulation, eq_params, lEq, propL);

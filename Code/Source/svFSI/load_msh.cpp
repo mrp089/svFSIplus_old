@@ -55,8 +55,7 @@ void read_ndnlff(const std::string& file_name, faceType& face)
   std::string str_value;
   std::vector<int> node_ids;
 
-  while (end_nodes_file.good() ) {
-    end_nodes_file >> str_value;
+  while (end_nodes_file >> str_value) {
     std::istringstream str_stream(str_value);
     if (!(str_stream >> node_id)) {
       throw std::runtime_error("Incorrect integer value '" + str_value + "' found in end nodes face file '" + file_name + "'."); 
@@ -73,7 +72,8 @@ void read_ndnlff(const std::string& file_name, faceType& face)
   face.nNo = node_ids.size();
   face.gN = Vector<int>(face.nNo);
   for (int i = 0; i < face.nNo; i++) { 
-    face.gN[i] = node_ids[i]; 
+    face.gN[i] = node_ids[i] - 1; 
+    //std::cout << "[read_ndnlff] a Ac: " << i+1 << " " << node_ids[i] << std::endl;
   }
 
   // Set the face element properties.
@@ -92,20 +92,21 @@ void read_ndnlff(const std::string& file_name, faceType& face)
 //
 void read_sv(Simulation* simulation, mshType& mesh, const MeshParameters* mesh_param)
 {
-  auto mesh_path = mesh_param->get_path();
+  auto mesh_path = mesh_param->mesh_file_path();
   auto mesh_name = mesh_param->get_name();
-  #define n_dbg_load_msh
-  #ifdef dbg_load_msh
-  DebugMsg dmsg(__func__, com_mod.cm.idcm());
+  #define n_dbg_read_sv
+  #ifdef dbg_read_sv
+  DebugMsg dmsg(__func__, simulation->com_mod.cm.idcm());
   dmsg.banner();
-  dmsg << "[read_sv] Mesh name: " << mesh_name;
+  dmsg << "Mesh name: " << mesh_name;
+  dmsg << "Mesh path: " << mesh_path;
   #endif
 
   // Read in volume mesh.
   vtk_xml::read_vtu(mesh_path, mesh);
 
   // Set mesh element properites for the input element type.
-  nn::select_ele(simulation, mesh);
+  nn::select_ele(simulation->com_mod, mesh);
 
   // Check the mesh element node ordering.
   //
@@ -132,9 +133,21 @@ void read_sv(Simulation* simulation, mshType& mesh, const MeshParameters* mesh_p
     auto face_param = mesh_param->face_parameters[i];
     auto& face = mesh.fa[i];
     face.name = face_param->name();
+    #ifdef dbg_read_sv
+    dmsg << "face.name: " << face.name;
+    #endif
+
+    face.qmTRI3 = face_param->quadrature_modifier_TRI3();
+    if (face.qmTRI3 < (1.0/3.0) || face.qmTRI3 > 1.0) {
+      throw std::runtime_error("Quadrature_modifier_TRI3 must be in the range [1/3, 1].");
+    }
 
     if (mesh.lFib) {
       auto face_path = face_param->end_nodes_face_file_path();
+      #ifdef dbg_read_sv
+      dmsg << "Read end nodes face file ... " << " ";
+      dmsg << "face_path: " << face_path;
+      #endif
       if (face_path == "") { 
         throw std::runtime_error("No end nodes face file path provided.");
       }
@@ -162,6 +175,7 @@ void read_sv(Simulation* simulation, mshType& mesh, const MeshParameters* mesh_p
 
     nn::select_eleb(simulation, mesh, face);
   }
+
 }
 
 };

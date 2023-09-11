@@ -13,10 +13,107 @@
 #include <sstream>
 #include <stdio.h>
 
+#include <vtkUnstructuredGrid.h>
+#include <vtkSmartPointer.h>
+#include <vtkXMLUnstructuredGridReader.h>
+
 namespace vtk_xml {
 
 #define dbg_vtk_xml
 #define n_dbg_read_vtu_pdata 
+
+void do_test()
+{
+
+  std::string file_name_1 = "x_remesh_restart_0__cm.bin";
+  std::string file_name_2 = "x_remesh_restart_1__cm.bin";
+
+  int num_1 = 769;
+  Array<double> coords_1(3,num_1);
+  coords_1.read(file_name_1);
+
+  int num_2 = 767;
+  Array<double> coords_2(3,num_2);
+  coords_2.read(file_name_2);
+
+  int num_dupe = 0;
+  double tol = 1e-4;
+
+  for (int i = 0; i < num_1; i++) {
+    double x1 = coords_1(0,i);
+    double y1 = coords_1(1,i);
+    double z1 = coords_1(2,i);
+
+    for (int j = 0; j < num_2; j++) {
+      double x2 = coords_2(0,j);
+      double y2 = coords_2(1,j);
+      double z2 = coords_2(2,j);
+      double d = sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) + (z1-z2)*(z1-z2));
+
+      if (d < tol) {
+        num_dupe += 1;
+        break;
+      }
+    }
+  }
+
+  std::cout << "Num dupe: " << num_dupe << std::endl;
+
+  vtkSmartPointer<vtkUnstructuredGrid> mesh;
+
+  std::string fileName = "mesh-complete/mesh-complete.mesh.vtu";
+  auto reader = vtkXMLUnstructuredGridReader::New();
+  reader->SetFileName(fileName.c_str());
+  reader->Update();
+  mesh = reader->GetOutput();
+
+  vtkIdType m_NumPoints = mesh->GetNumberOfPoints();
+  vtkIdType m_NumCells = mesh->GetNumberOfCells();
+  std::cout << "  Number of points: " << m_NumPoints << std::endl;
+  std::cout << "  Number of cells: " << m_NumCells << std::endl;
+
+  auto numPoints = mesh->GetNumberOfPoints();
+  auto points = mesh->GetPoints();
+
+  double pt[3];
+  int num_found_1 = 0;
+  int num_found_2 = 0;
+
+  for (int i = 0; i < numPoints; i++) {
+    points->GetPoint(i,pt);
+    double x = pt[0];
+    double y = pt[1];
+    double z = pt[2];
+
+    for (int i = 0; i < num_1; i++) {
+      double x1 = coords_1(0,i);
+      double y1 = coords_1(1,i);
+      double z1 = coords_1(2,i);
+      double d = sqrt((x1-x)*(x1-x) + (y1-y)*(y1-y) + (z1-z)*(z1-z));
+
+      if (d < tol) {
+        num_found_1 += 1;
+        break;
+      }
+    }
+
+    for (int j = 0; j < num_2; j++) {
+      double x2 = coords_2(0,j);
+      double y2 = coords_2(1,j);
+      double z2 = coords_2(2,j);
+      double d = sqrt((x2-x)*(x2-x) + (y2-y)*(y2-y) + (z2-z)*(z2-z));
+      if (d < tol) {
+        num_found_2 += 1;
+        break;
+      }
+    }
+  }
+
+  std::cout << "num_found_1: " << num_found_1 << std::endl;
+  std::cout << "num_found_2: " << num_found_2 << std::endl;
+
+  //exit(0);
+}
 
 //--------------
 // int_msh_data
@@ -346,10 +443,12 @@ void read_vtp(const std::string& file_name, faceType& face)
 
     for (int i = 0; i < face.gE.size(); i++) {
       face.gebc(0,i) = face.gE(i);
+      //std::cout << "[read_vtp] i: " << i+1 << "  gebc: " << face.gebc(0,i) << " "; 
       for (int j = 0; j < face.eNoN; j++) {
         face.gebc(j+1,i) = face.IEN(j,i);
-        face.gebc(j+1,i) = face.IEN(j,i);
+        //std::cout << face.gebc(j+1,i) << " "; 
       }
+      //std::cout << std::endl; 
     }
   }
 }
@@ -637,6 +736,92 @@ void read_vtus(Simulation* simulation, Array<double>& lA, Array<double>& lY, Arr
   }
 }
 
+//-----------
+// write_vtp
+//-----------
+// Reproduces Fortran 'SUBROUTINE WRITEVTP(lFa, fName)'
+//
+void write_vtp(ComMod& com_mod, faceType& lFa, const std::string& fName)
+{
+  const int nsd = com_mod.nsd;
+  //std::cout << "[write_vtp] ========== write_vtp ==========" << std::endl;
+  //std::cout << "[write_vtp] lFa.x.size(): " << lFa.x.size() << std::endl;
+  //std::cout << "[write_vtp] lFa.IEN.size(): " << lFa.IEN.size() << std::endl;
+
+  auto vtk_writer = VtkData::create_writer(fName);
+  vtk_writer->set_points(lFa.x);
+  vtk_writer->set_connectivity(nsd, lFa.IEN);
+
+  if (lFa.gN.size() != 0) {
+    vtk_writer->set_point_data("GlobalNodeID", lFa.gN);
+  }
+
+  if (lFa.gE.size() != 0) {
+    vtk_writer->set_point_data("GlobalElementID", lFa.gE);
+  }
+
+  vtk_writer->write();
+  delete vtk_writer;
+}
+
+//-----------
+// write_vtu
+//-----------
+// Reproduces Fortran 'SUBROUTINE WRITEVTU(lM, fName)'
+//
+void write_vtu(ComMod& com_mod, mshType& lM, const std::string& fName)
+{
+  const int nsd = com_mod.nsd;
+  //std::cout << "[write_vtu] ========== write_vtu ==========" << std::endl;
+  //std::cout << "[write_vtu] fName: " << fName << std::endl;
+
+  auto vtk_writer = VtkData::create_writer(fName);
+
+  vtk_writer->set_points(lM.x);
+  vtk_writer->set_connectivity(nsd, lM.gIEN);
+  vtk_writer->write();
+
+  delete vtk_writer;
+}
+
+//-----------------
+// write_vtu_debug
+//-----------------
+// This function can be called withing the code for distributed meshes for debugging.
+//
+void write_vtu_debug(ComMod& com_mod, mshType& lM, const std::string& fName)
+{
+  const int nsd = com_mod.nsd;
+  //std::cout << "[write_vtu_debug] ========== write_vtu_debug ==========" << std::endl;
+  //std::cout << "[write_vtu_debug] fName: " << fName << std::endl;
+  //std::cout << "[write_vtu_debug] nsd: " << nsd << std::endl;
+  //std::cout << "[write_vtu_debug] lM.nNo: " << lM.nNo << std::endl;
+  //std::cout << "[write_vtu_debug] lM.gIEN nrows: " << lM.gIEN.nrows() << std::endl;
+  //std::cout << "[write_vtu_debug]         ncols: " << lM.gIEN.ncols() << std::endl;
+  //std::cout << "[write_vtu_debug] lM.IEN nrows: " << lM.IEN.nrows() << std::endl;
+  //std::cout << "[write_vtu_debug]        ncols: " << lM.IEN.ncols() << std::endl;
+  //std::cout << "[write_vtu_debug] lM.gN size: " << lM.gN.size() << std::endl;
+
+  Array<double> x(nsd, lM.nNo);
+
+  for (int a = 0; a < lM.nNo; a++) {
+    int Ac = lM.gN(a);
+    for (int i = 0; i < nsd; i++) {
+      x(i,a) = com_mod.x(i,Ac);
+    }
+  }
+
+  auto vtk_writer = VtkData::create_writer(fName);
+
+  vtk_writer->set_points(x);
+
+  vtk_writer->set_connectivity(nsd, lM.IEN);
+
+  vtk_writer->write();
+
+  delete vtk_writer;
+}
+
 //------------
 // write_vtus
 //------------
@@ -644,6 +829,12 @@ void read_vtus(Simulation* simulation, Array<double>& lA, Array<double>& lY, Arr
 //
 void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<double>& lY, const Array<double>& lD, const bool lAve)
 {
+  #define n_debug_write_vtus
+  #ifdef debug_write_vtus 
+  DebugMsg dmsg(__func__, simulation->com_mod.cm.idcm());
+  dmsg.banner();
+  #endif
+
   using namespace consts;
 
   auto& com_mod = simulation->com_mod;
@@ -690,6 +881,9 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
       }
 
       auto oGrp = eq.output[iOut].grp;
+      #ifdef debug_write_vtus 
+      dmsg << "oGrp: " << oGrp;
+      #endif
 
       if (oGrp == OutputType::outGrp_fN) {
         nFn = 1;
@@ -703,7 +897,8 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
         outDof = outDof + eq.output[iOut].l;
       }
 
-      if (oGrp == OutputType::outGrp_J || oGrp == OutputType::outGrp_mises) {
+      if (oGrp == OutputType::outGrp_J || oGrp == OutputType::outGrp_mises ||
+          oGrp == OutputType::outGrp_I1) { 
         nOute = nOute + 1;
       }
     }
@@ -810,6 +1005,13 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
           break;
 
           case OutputType::outGrp_D:
+            #ifdef debug_write_vtus 
+            dmsg << "case " << " outGrp_D ";
+            dmsg << "is: " << is;
+            dmsg << "ie: " << ie;
+            dmsg << "s: " << s;
+            dmsg << "e: " << e;
+            #endif
             for (int a = 0; a < msh.nNo; a++) {
               int Ac = msh.gN(a);
               for (int i = 0; i < l; i++) {
@@ -889,6 +1091,9 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
           case OutputType::outGrp_stress:
           case OutputType::outGrp_cauchy:
           case OutputType::outGrp_mises:
+            #ifdef debug_write_vtus 
+            dmsg << "case " << " outGrp_stress";
+            #endif
             tmpV.resize(l,msh.nNo); 
             tmpVe.resize(msh.nEl);
 
@@ -901,8 +1106,13 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
               }
             }
 
-            if (!com_mod.cmmInit) {
-              post::tpost(simulation, msh, l, tmpV, tmpVe, lD, lY, iEq, oGrp);
+            if (msh.lShl) {
+              post::shl_post(simulation, msh, l, tmpV, tmpVe, lD, iEq, oGrp);
+              //CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD, iEq,oGrp)
+            } else { 
+              if (!com_mod.cmmInit) {
+                post::tpost(simulation, msh, l, tmpV, tmpVe, lD, lY, iEq, oGrp);
+              }
             }
 
             for (int a = 0; a < msh.nNo; a++) {
@@ -925,10 +1135,20 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
           case OutputType::outGrp_J:
           case OutputType::outGrp_F:
           case OutputType::outGrp_strain:
+          case OutputType::outGrp_fS:
+          case OutputType::outGrp_I1:
+            #ifdef debug_write_vtus 
+            dmsg << "case " << " outGrp_J";
+            #endif
             tmpV.resize(l,msh.nNo); 
             tmpVe.resize(msh.nEl);
 
-            post::tpost(simulation, msh, l, tmpV, tmpVe, lD, lY, iEq, oGrp);
+            if (msh.lShl) {
+              post::shl_post(simulation, msh, l, tmpV, tmpVe, lD, iEq, oGrp);
+              //CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD, iEq,oGrp)
+            } else {
+              post::tpost(simulation, msh, l, tmpV, tmpVe, lD, lY, iEq, oGrp);
+            }
 
             for (int a = 0; a < msh.nNo; a++) {
               for (int i = 0; i < l; i++) {
@@ -942,6 +1162,14 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
                 d[iM].xe(nOute,a) = tmpVe(a);
               }
               nOute = nOute + 1;
+            }
+
+            if (oGrp == OutputType::outGrp_I1) {
+              outNamesE[nOute] = "E_CG_I1";
+              nOute = nOute + 1;
+              for (int a = 0; a < msh.nEl; a++) {
+                d[iM].xe(nOute,a) = tmpVe(a);
+              }
             }
 
             tmpV.resize(consts::maxNSD,msh.nNo);
@@ -1043,33 +1271,23 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
 
   // Writing the connectivity data
   //
-
-  // [NOTE] This is a hack for now, only includes elements
-  // of a single type and write all connectivity at one time.
-  //
-  std::map<int,int> np_elem_map;
-  int eNoN = 0;
-  for (int iM = 0; iM < nMsh; iM++) {
-    eNoN = d[iM].eNoN;
-    np_elem_map[eNoN] += 1;
-  }
-  Array<int> tmpI(eNoN, nEl);
-
   nSh = 0;     // For 0-based IDs.
   int num_elems = 0;
 
   for (int iM = 0; iM < nMsh; iM++) {
-    for (int e = 0; e < d[iM].nEl; e++) {
-      for (int i = 0; i < d[iM].eNoN; i++) {
-        tmpI(i,num_elems) = d[iM].IEN(i,e) + nSh;
+    int eNoN = d[iM].eNoN;
+    int nEl = d[iM].nEl;
+    Array<int> tmpI(eNoN, nEl);
+
+    for (int e = 0; e < nEl; e++) {
+      for (int i = 0; i < eNoN; i++) {
+        tmpI(i,e) = d[iM].IEN(i,e) + nSh;
       }
-      num_elems += 1;
     }
 
+    vtk_writer->set_connectivity(nsd, tmpI);
     nSh = nSh + d[iM].nNo;
   }
-
-  vtk_writer->set_connectivity(nsd, tmpI);
 
   // Writing all solutions
   //

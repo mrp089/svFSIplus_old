@@ -364,6 +364,15 @@ class stModelType
     // Collagen fiber dispersion parameter (Holzapfel model)
     double kap = 0.0;
 
+    // Heaviside function parameter (Holzapfel-Ogden model)
+    double khs = 100.0;
+
+    // Lee-Sacks model
+    double a0 = 0.0;
+    double b1 = 0.0;
+    double b2 = 0.0;
+    double mu0 = 0.0;
+
     // Fiber reinforcement stress
     fibStrsType Tf;
 };
@@ -578,6 +587,9 @@ class faceType
 
     // Function spaces (basis)
     std::vector<fsType> fs;
+
+    // TRI3 quadrature modifier
+    double qmTRI3 = 2.0/3.0;
 };
 
 // Declared type for outputed variables
@@ -663,7 +675,7 @@ class cntctModelType
 {
   public:
     // Contact model
-    int cType = 0;
+    consts::ContactModelType cType = consts::ContactModelType::cntctM_NA;
 
     // Penalty parameter
     double k = 0.0;
@@ -781,6 +793,7 @@ class mshType
 {
   public:
     mshType();
+    std::string dname = "";
 
 /*
     mshType(const mshType &other) 
@@ -797,7 +810,7 @@ class mshType
 
     ~mshType() 
     { 
-      std::cout << "- - - - -  mshType dtor - - - - - " << std::endl;
+      //std::cout << "- - - - -  mshType dtor - - - - -   dname: " << dname << std::endl;
     };
 
     // Whether the shape function is linear
@@ -947,6 +960,14 @@ class mshType
 
     // IB: tracers
     traceType trc;
+
+    // TET4 quadrature modifier
+    double qmTET4 = (5.0+3.0*sqrt(5.0))/20.0;
+
+  private:
+    //mshType(const mshType&);
+    //mshType& operator=(const mshType&);
+
 };
 
 //--------
@@ -1123,7 +1144,7 @@ class rmshType
     bool isReqd = false;
 
     // Method for remeshing: 1-TetGen, 2-MeshSim
-    int method = 0;
+    consts::MeshGeneratorType method = consts::MeshGeneratorType::RMSH_TETGEN;
 
     // Counter to track number of remesh done
     int cntr = 0;
@@ -1135,10 +1156,10 @@ class rmshType
     int cpVar = 0;
 
     // Time step at which forced remeshing is done
-    int fTS = 0;
+    int fTS = 1000;
 
     // Time step frequency for forced remeshing
-    int freq = 0;
+    int freq = 1000;
 
     // Time where remeshing starts
     double time = 0.0;

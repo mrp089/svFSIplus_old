@@ -8,6 +8,7 @@
 #include "all_fun.h"
 #include "consts.h"
 #include "load_msh.h"
+#include "nn.h"
 #include "read_msh.h"
 #include "utils.h"
 #include "vtk_xml.h"
@@ -55,6 +56,13 @@ std::map<consts::ElementType, std::function<void(mshType&)>> check_element_conn 
 //
 void calc_elem_ar(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rflag)
 {
+  #define n_debug_calc_elem_ar  
+  #ifdef debug_calc_elem_ar
+  DebugMsg dmsg(__func__, com_mod.cm.idcm());
+  dmsg.banner();
+  dmsg << "lM.nEl: " << lM.nEl;
+  #endif
+
   using namespace consts;
 
   if (lM.eType != ElementType::TET4 && lM.eType != ElementType::TRI3) {
@@ -79,7 +87,7 @@ void calc_elem_ar(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rflag
       xl.set_col(a, com_mod.x.col(Ac));
       if (com_mod.mvMsh) {
         for (int i = 0; i < nsd; i++) {
-          dol(i,a) = com_mod.Do(i+nsd,Ac);
+          dol(i,a) = com_mod.Do(i+nsd+1,Ac);
         }
       }
     }
@@ -109,9 +117,15 @@ void calc_elem_ar(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rflag
     }
   } 
 
-  double maxAR = AsR.max();
+  double maxAR = -std::numeric_limits<double>::max();
+  if (AsR.size() != 0) {
+    maxAR = AsR.max();
+  }
   maxAR = com_mod.cm.reduce(cm_mod, maxAR, MPI_MAX);
   bins = com_mod.cm.reduce(cm_mod, bins);
+  #ifdef debug_calc_elem_ar
+  dmsg << "maxAR: " << maxAR;
+  #endif
 
   std::array<double,5> tmp;
   for (int i = 0; i < 5; i++) {
@@ -140,10 +154,22 @@ void calc_elem_ar(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rflag
 //
 void calc_elem_jac(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rflag)
 {
+  #define n_debug_calc_elem_jac 
+  #ifdef debug_calc_elem_jac 
+  DebugMsg dmsg(__func__, com_mod.cm.idcm());
+  dmsg.banner();
+  dmsg << "lM.nEl: " << lM.nEl;
+  dmsg << "lM.eNoN: " << lM.eNoN;
+  dmsg << "lM.Nx.nrows: " << lM.Nx.nrows();
+  dmsg << "lM.Nx.cols: " << lM.Nx.ncols();
+  dmsg << "lM.Nx.slices: " << lM.Nx.nslices();
+  #endif
   using namespace consts;
   const int nsd = com_mod.nsd;
   rflag = false; 
 
+  // Careful here, lM.nEl can be 0.
+  //
   Vector<double> Jac(lM.nEl);
   Array<double> xl(nsd,lM.eNoN);
   Array<double> dol(nsd,lM.eNoN);
@@ -154,13 +180,15 @@ void calc_elem_jac(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfla
   for (int e = 0; e < lM.nEl; e++) {
     int iDmn = all_fun::domain(com_mod, lM, cEq, e);
     auto cPhys = com_mod.eq[cEq].dmn[iDmn].phys;
+    //dmsg << ">>> e: " << e;
 
     for (int a = 0; a < lM.eNoN; a++) {
       int Ac = lM.IEN(a,e);
       xl.set_col(a, com_mod.x.col(Ac));
       if (com_mod.mvMsh) {
         for (int i = 0; i < nsd; i++) {
-          dol(i,a) = com_mod.Do(i+nsd,Ac);
+          dol(i,a) = com_mod.Do(i+nsd+1,Ac);
+          //dol(i,a) = com_mod.Do(i+nsd,Ac);
         }
       }
     }
@@ -169,21 +197,48 @@ void calc_elem_jac(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfla
       xl = xl + dol;
     }
 
-    Jac(e) = all_fun::jacobian(com_mod, nsd, lM.eNoN, xl, lM.Nx.slice(0));
+    if (Jac.size() != 0) {
+      //dmsg << "Comp jac ... " << 1;
+      Jac(e) = all_fun::jacobian(com_mod, nsd, lM.eNoN, xl, lM.Nx.slice(0));
 
-    if (Jac(e) < 0.0) {
-      cnt = cnt + 1;
-      if (cPhys != Equation_fluid) {
-        throw std::runtime_error("[calc_elem_jac] Negative Jacobian in non-fluid domain.");
+      if (Jac(e) < 0.0) {
+        #ifdef debug_calc_elem_jac 
+        dmsg << "e Jac(e) " + std::to_string(e) + ": " << Jac(e);
+        #endif
+        cnt = cnt + 1;
+        if (cPhys != Equation_fluid) {
+          throw std::runtime_error("[calc_elem_jac] Negative Jacobian in non-fluid domain.");
+        }
       }
-    }
+    } 
   } 
 
-  double maxJ = Jac.abs().max();
+  double maxJ = -std::numeric_limits<double>::max();
+  if (Jac.size() != 0) {
+    maxJ = Jac.abs().max();
+  }
+  #ifdef debug_calc_elem_jac 
+  dmsg << "maxJ: " << maxJ;
   maxJ = com_mod.cm.reduce(cm_mod, maxJ, MPI_MAX);
-  Jac = Jac / std::abs(maxJ);
+  #endif
 
-  double minJ = Jac.min();
+  #ifdef debug_calc_elem_jac 
+  dmsg << "reduce maxJ: " << maxJ;
+  #endif
+  double minJ = std::numeric_limits<double>::max();
+  if (Jac.size() != 0) {
+    Jac = Jac / std::abs(maxJ);
+    minJ = Jac.min();
+  }
+  #ifdef debug_calc_elem_jac 
+  dmsg << "minJ: " << minJ;
+  #endif
+
+  minJ = com_mod.cm.reduce(cm_mod, minJ, MPI_MIN);
+  #ifdef debug_calc_elem_jac 
+  dmsg << "reduce minJ: " << minJ;
+  #endif
+
   cnt = com_mod.cm.reduce(cm_mod, cnt);
   double tmp = 100.0 * static_cast<double>(cnt) / static_cast<double>(lM.gnEl);
 
@@ -204,11 +259,15 @@ void calc_elem_jac(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfla
     std = "    Min normalized Jacobian <"//minJ//">"
     std = "    No. of Elements with Jac < 0: "//cnt// 2  " ("//tmp//".)"
     */
+    //dmsg << "Mesh is DISTORTED (Min. Jacobian < 0) at time " << com_mod.cTS;
 
     if (!com_mod.rmsh.isReqd) {
       throw std::runtime_error("[calc_elem_jac] Unexpected behavior! Mesh is DISTORTED.");
     }
   }
+  #ifdef debug_calc_elem_jac 
+  dmsg << "Done " << "";
+  #endif
 }
 
 //----------------
@@ -218,6 +277,13 @@ void calc_elem_jac(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfla
 //
 void calc_elem_skew(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rflag)
 {
+  #define n_debug_calc_elem_skew
+  #ifdef debug_calc_elem_skew
+  DebugMsg dmsg(__func__, com_mod.cm.idcm());
+  dmsg.banner();
+  dmsg << "rflag: " << rflag;
+  dmsg << "lM.nEl: " << lM.nEl;
+  #endif
   using namespace consts;
   const int nsd = com_mod.nsd;
 
@@ -241,7 +307,7 @@ void calc_elem_skew(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfl
       xl.set_col(a, com_mod.x.col(Ac));
       if (com_mod.mvMsh) {
         for (int i = 0; i < nsd; i++) {
-          dol(i,a) = com_mod.Do(i+nsd,Ac);
+          dol(i,a) = com_mod.Do(i+nsd+1,Ac);
         }
       }
     }
@@ -264,8 +330,14 @@ void calc_elem_skew(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfl
     } 
   } 
 
-  double maxSk = Skw.max();
+  double maxSk = -std::numeric_limits<double>::max();
+  if (Skw.size() != 0) {
+    maxSk = Skw.max();
+  }
   maxSk = com_mod.cm.reduce(cm_mod, maxSk, MPI_MAX);
+  #ifdef debug_calc_elem_skew
+  dmsg << "maxSk: " << maxSk;
+  #endif
   bins = com_mod.cm.reduce(cm_mod, bins);
 
   std::array<double,5> tmp;
@@ -286,6 +358,9 @@ void calc_elem_skew(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfl
     //std = "    Max Skewness <"//maxSk//">"
   }
 
+  #ifdef debug_calc_elem_skew
+  dmsg << "Done" << "";
+  #endif
 }
 
 //-----------------
@@ -294,18 +369,34 @@ void calc_elem_skew(ComMod& com_mod, const CmMod& cm_mod, mshType& lM, bool& rfl
 //
 void calc_mesh_props(ComMod& com_mod, const CmMod& cm_mod, const int nMesh, std::vector<mshType>& mesh)
 {
+  #define n_debug_calc_mesh_props
+  #ifdef debug_calc_mesh_props
+  DebugMsg dmsg(__func__, com_mod.cm.idcm());
+  dmsg.banner();
+  #endif
+
   using namespace consts;
   auto& rmsh = com_mod.rmsh;
+  #ifdef debug_calc_mesh_props
+  dmsg << "nMesh: " << nMesh; 
+  dmsg << "resetSim: " << com_mod.resetSim; 
+  dmsg << "com_mod.cTS: " << com_mod.cTS;
+  dmsg << "rmsh.fTS: " << rmsh.fTS; 
+  dmsg << "rmsh.freq: " << rmsh.freq; 
+  #endif
 
   for (int iM = 0; iM < nMesh; iM++) {
-    bool flag;
+    #ifdef debug_calc_mesh_props
+    dmsg << "----- mesh " + mesh[iM].name << " -----";
+    #endif
+    bool flag = false;
     calc_elem_jac(com_mod, cm_mod, mesh[iM], flag);
-
     calc_elem_skew(com_mod, cm_mod, mesh[iM], flag);
-
     calc_elem_ar(com_mod, cm_mod, mesh[iM], flag);
-
     rmsh.flag[iM] = flag;
+    #ifdef debug_calc_mesh_props
+    dmsg << "mesh[iM].flag: " << rmsh.flag[iM];
+    #endif
   }
 
   if (rmsh.isReqd && std::count(rmsh.flag.begin(), rmsh.flag.end(), true) != rmsh.flag.size()) {
@@ -328,7 +419,17 @@ void calc_mesh_props(ComMod& com_mod, const CmMod& cm_mod, const int nMesh, std:
 
   Array<bool> gFlag(nMesh, com_mod.cm.np());
 
-  MPI_Allgather(&rmsh.flag, nMesh, cm_mod::mplog, gFlag.data(), nMesh, cm_mod::mplog, com_mod.cm.com());
+  // The bool vector rmsh.flag does not have a data()
+  // method so copy the data into a bool array.
+  //
+  bool* rmsh_flag = new bool[rmsh.flag.size()];
+  for (int i = 0; i < rmsh.flag.size(); i++) {
+    rmsh_flag[i] = rmsh.flag[i];
+  }
+
+  MPI_Allgather(rmsh_flag, nMesh, cm_mod::mplog, gFlag.data(), nMesh, cm_mod::mplog, com_mod.cm.com());
+
+  delete[] rmsh_flag;
 
   for (int iM = 0; iM < nMesh; iM++) {
     rmsh.flag[iM] = false;
@@ -359,8 +460,16 @@ void calc_mesh_props(ComMod& com_mod, const CmMod& cm_mod, const int nMesh, std:
 //   face.gN - Face global node Ids 
 //   face.nNo - Number of nodes
 //
+// Reproduces 'SUBROUTINE CALCNBC(lM, lFa)'
+//
 void calc_nbc(mshType& mesh, faceType& face)
 {
+  #define n_debug_calc_nbc 
+  #ifdef debug_calc_nbc 
+  DebugMsg dmsg(__func__, 0);
+  dmsg.banner();
+  dmsg << "Face: " << face.name;
+  #endif
   int num_elems = mesh.gnEl;
   int num_nodes = mesh.gnNo;
   auto incNd = Vector<int>(mesh.gnNo);
@@ -371,7 +480,10 @@ void calc_nbc(mshType& mesh, faceType& face)
   std::string msg("[calc_nbc] ");
 
   for (int e = 0; e < face.nEl; e++ ) {
+    //dmsg << "---- e " << std::to_string(e+1) + " -----";
     int Ec = face.gE(e);
+    //dmsg << "Ec: " << Ec;
+
     if (Ec > num_elems) {
       throw std::runtime_error(msg + "element ID " + std::to_string(Ec) + " exceeds the number of elements (" + std::to_string(num_elems) +
           ") in the mesh.");
@@ -381,6 +493,7 @@ void calc_nbc(mshType& mesh, faceType& face)
 
     for (int a = 0; a < face.eNoN; a++) {
       int Ac = face.IEN(a,e);
+      //dmsg << "Ac: " << Ac;
       if (Ac > num_nodes) { 
         throw std::runtime_error(msg + "element " + std::to_string(e) + " has a node " + std::to_string(Ac) + " that exceeds the number of nodes (" + 
             std::to_string(num_nodes) + ") in the mesh.");
@@ -580,10 +693,15 @@ void check_quad4_conn(mshType& mesh)
 //
 void check_tet_conn(mshType& mesh)
 {
+  //std::cout << "[check_tet_conn] ========== check_tet_conn ========== " << std::endl;
   Vector<double> v1, v2, v3;
   int num_elems = mesh.gnEl;
+  int num_reorder = 0;
+  //std::cout << "[check_tet_conn] mesh.gIEN.data(): " << mesh.gIEN.data() << std::endl;
+  //std::cout << "[check_tet_conn] mesh.x.data(): " << mesh.x.data() << std::endl;
 
   for (int e = 0; e < num_elems; e++) {
+    //std::cout << "[check_tet_conn] -------- e " << e << std::endl;
     int a = 0, b = 0;
     bool qFlag = false;
     auto elem_conn = mesh.gIEN.col(e);
@@ -599,9 +717,11 @@ void check_tet_conn(mshType& mesh)
       a = 0;
       b = 1;
       qFlag = true;
+      num_reorder += 1;
       if (e == 0) {
-        //std::cout << "[check_tet_conn] Reorder element connectivity." << std::endl;
+        //std::cout << "[check_tet_conn] Reorder element connectivity for element " << e << std::endl;
       }
+      //std::cout << "[check_tet_conn] Reorder element connectivity for element " << e << std::endl;
     } else if (sn == 0) { 
       throw std::runtime_error("Tet element " + std::to_string(e) + " is distorted.");
     } 
@@ -617,6 +737,8 @@ void check_tet_conn(mshType& mesh)
       }
     }
   }
+
+  //std::cout << "[check_tet_conn] Reorder " << num_reorder << " element connectivity from " << num_elems << "  elements." << std::endl;
 }
 
 //-----------------
@@ -791,6 +913,14 @@ void load_var_ini(Simulation* simulation, ComMod& com_mod)
 //
 void match_faces(const ComMod& com_mod, const faceType& lFa, const faceType& pFa, const double ptol, utils::stackType& lPrj)
 {
+  #define n_debug_match_faces
+  #ifdef debug_match_faces
+  DebugMsg dmsg(__func__, com_mod.cm.idcm());
+  dmsg.banner();
+  dmsg << "lFa.name: " << lFa.name;
+  dmsg << "pFa.name: " << pFa.name;
+  #endif
+
   int iM  = lFa.iM;
   int iSh = 0;
   for (int i = 0; i < iM; i++) {
@@ -802,6 +932,13 @@ void match_faces(const ComMod& com_mod, const faceType& lFa, const faceType& pFa
   for (int j = 0; j < jM; j++) {
     jSh = jSh + com_mod.msh[j].gnNo;
   }
+
+  #ifdef debug_match_faces
+  dmsg << "iM: " << iM;
+  dmsg << "iSh: " << iSh;
+  dmsg << "jM: " << jM;
+  dmsg << "jSh: " << jSh;
+  #endif
 
   double tol;
   double eps = std::numeric_limits<double>::epsilon();
@@ -823,6 +960,11 @@ void match_faces(const ComMod& com_mod, const faceType& lFa, const faceType& pFa
   }
   int nsd = com_mod.nsd;;
   int nBk = pow(nBkd, nsd);
+  #ifdef debug_match_faces
+  dmsg << "a: " << a;
+  dmsg << "nBkd: " << nBkd;
+  dmsg << "nBk: " << nBk;
+  #endif
 
   // Find the extents of the domain and size of each block.
   //
@@ -925,6 +1067,11 @@ void match_faces(const ComMod& com_mod, const faceType& lFa, const faceType& pFa
     }
   }
 
+  #ifdef debug_match_faces
+  dmsg << "cnt: " << cnt;
+  dmsg << "lFa.nNo: " << lFa.nNo;
+  #endif
+
   if (cnt != lFa.nNo) {
     throw std::runtime_error("Failed to find matching nodes between faces " + lFa.name + " and " + pFa.name + ".");
   }
@@ -945,6 +1092,8 @@ void match_faces(const ComMod& com_mod, const faceType& lFa, const faceType& pFa
 // Read fiber direction from a vtu file.
 //
 // The fiber orientations data is copied into mesh.fN. 
+//
+// Reproduces Fortran READFIBNFF.
 //
 void read_fib_nff(Simulation* simulation, mshType& mesh, const std::string& fName, const std::string& kwrd, const int idx)
 {
@@ -968,7 +1117,8 @@ void read_msh(Simulation* simulation)
   #ifdef debug_read_msh 
   DebugMsg dmsg(__func__, com_mod.cm.idcm());
   dmsg.banner();
-  dmsg <<  "resetSim: " << com_mod.resetSim;
+  dmsg << "resetSim: " << com_mod.resetSim;
+  dmsg << "gtnNo: " << com_mod.gtnNo;
   #endif
 
   // Allocate global 'msh' vector of mshType objects.
@@ -976,7 +1126,6 @@ void read_msh(Simulation* simulation)
   // READMSH - ALLOCATE (msh(nMsh), gX(0,0))
   //
   com_mod.nMsh = simulation->parameters.mesh_parameters.size();
-  com_mod.msh.resize(com_mod.nMsh);
   #ifdef debug_read_msh 
   dmsg << "Number of meshes: " << com_mod.nMsh;
   #endif
@@ -986,136 +1135,161 @@ void read_msh(Simulation* simulation)
   std::array<double,3> min_x{min_dval, min_dval, min_dval};
   std::array<double,3> max_x{max_dval, max_dval, max_dval};
 
-  // [NOTE] We are not processing 'resetSim' here, not sure what that does..
-  //
-  // I guess we should put all of the follow code in a function.
-  /*
-  IF (.NOT.resetSim) THEN
-  */
+  Array<double> gX;
 
-  // Global total number of nodes.
-  com_mod.gtnNo = 0;
-
-  // Set mesh parameters and read mesh data.
-  //
-  // READMSH - lPtr => lPM%get(msh(iM)%lShl,"Set mesh as shell") 
-  //
-  // READMSH - CALL READSV(lPM, msh(iM)) 
-  //
-  for (int iM = 0; iM < com_mod.nMsh; iM++) {
-    auto param = simulation->parameters.mesh_parameters[iM];
-    auto& mesh = com_mod.msh[iM];
-
-    mesh.name = param->name();
-    mesh.lShl = param->set_mesh_as_shell();
-    mesh.lFib = param->set_mesh_as_fibers();
-    mesh.scF = param->mesh_scale_factor();
-    #ifdef debug_read_msh 
-    dmsg << "Mesh name: " << mesh.name;
-    dmsg << "  mesh.lShl: " << mesh.lShl;
-    dmsg << "  mesh.lFib: " << mesh.lFib;
-    dmsg << "  scale factor: " << mesh.scF;
-    #endif
-
-    // Read mesh nodal coordinates and element connectivity.
-    load_msh::read_sv(simulation, mesh, param);
-
-    // [NOTE] What is this all about?
-    if (mesh.eType == consts::ElementType::NA) {
-      load_msh::read_ccne(simulation, mesh, param);
-    }
-
-    // Allocate mesh local to global nodes map (gN).
-    #ifdef debug_read_msh 
-    dmsg << "mesh.gnNo: " << mesh.gnNo;
-    #endif
-    mesh.gN = Vector<int>(mesh.gnNo);
-    mesh.gN = -1;
-
-    // Check for unique face names.
-    //
-    #ifdef debug_read_msh 
-    dmsg << "Check for unique face names ....";
-    #endif
-    for (int iFa = 0; iFa < mesh.nFa; iFa++) {
-      mesh.fa[iFa].iM = iM;
-      auto ctmp = mesh.fa[iFa].name;
-      for (int i = 0; i < iM; i++) {
-        for (int j = 0; j < com_mod.msh[i].nFa; j++) {
-          if ((ctmp == com_mod.msh[i].fa[j].name) && ((i != iM || j != iFa))) { 
-            throw std::runtime_error("The face name '" + ctmp + "' is duplicated."); 
-          }
-        }
-      } 
-    } 
+  if (!com_mod.resetSim) {
+    com_mod.msh.resize(com_mod.nMsh);
 
     // Global total number of nodes.
-    com_mod.gtnNo += mesh.gnNo;
-    #ifdef debug_read_msh 
-    dmsg << "Global total number of nodes (gtnNo): " << com_mod.gtnNo;
-    #endif
-  }
+    com_mod.gtnNo = 0;
 
-  // Create global nodal coordinate array. 
-  //
-  // Scale the nodal coordinates. 
-  //
-  auto gX = Array<double>(com_mod.nsd, com_mod.gtnNo);
-  int n = 0;
+    // Set mesh parameters and read mesh data.
+    //
+    // READMSH - lPtr => lPM%get(msh(iM)%lShl,"Set mesh as shell") 
+    //
+    // READMSH - CALL READSV(lPM, msh(iM)) 
+    //
+    for (int iM = 0; iM < com_mod.nMsh; iM++) {
+      auto param = simulation->parameters.mesh_parameters[iM];
+      auto& mesh = com_mod.msh[iM];
+      mesh.dname = "read_msh: " + std::to_string(iM+1);
 
-  for (auto& mesh : com_mod.msh) {
-    for (int i = 0; i < mesh.gnNo; i++) {
-      for (int j = 0; j < com_mod.nsd; j++) {
-        gX(j,n) = mesh.scF * mesh.x(j,i); 
+      mesh.name = param->name();
+      mesh.lShl = param->set_mesh_as_shell();
+      mesh.lFib = param->set_mesh_as_fibers();
+      mesh.scF = param->mesh_scale_factor();
+      #ifdef debug_read_msh 
+      dmsg << "Mesh name: " << mesh.name;
+      dmsg << "  mesh.lShl: " << mesh.lShl;
+      dmsg << "  mesh.lFib: " << mesh.lFib;
+      dmsg << "  scale factor: " << mesh.scF;
+      #endif
+
+      // Read mesh nodal coordinates and element connectivity.
+      load_msh::read_sv(simulation, mesh, param);
+
+      // [NOTE] What is this all about?
+      if (mesh.eType == consts::ElementType::NA) {
+        load_msh::read_ccne(simulation, mesh, param);
       }
-    n += 1;
-    }
-    mesh.x.clear();
-  }
 
-  com_mod.x = gX;
+      // Allocate mesh local to global nodes map (gN).
+      #ifdef debug_read_msh 
+      dmsg << "mesh.gnNo: " << mesh.gnNo;
+      #endif
+      mesh.gN = Vector<int>(mesh.gnNo);
+      mesh.gN = -1;
 
-  // Check for shell elements.
-  //
-  for (int iM = 0; iM < com_mod.nMsh; iM++) {
-    auto& mesh = com_mod.msh[iM];
-    if (mesh.lShl) {
-      if (mesh.eType != consts::ElementType::NRB && mesh.eType != consts::ElementType::TRI3) {
-        throw std::runtime_error("Shell elements must be triangles or C1-NURBS.");
-      }
-      if (mesh.eType == consts::ElementType::NRB) {
-        for (int i = 0; i < com_mod.nsd-1; i++) {
-          if (mesh.bs[i].p <= 1) {
-            throw std::runtime_error("NURBS for shell elements must have be p > 1.");
-          } 
+      // Check for unique face names.
+      //
+      #ifdef debug_read_msh 
+      dmsg << "Check for unique face names " << " ....";
+      #endif
+      for (int iFa = 0; iFa < mesh.nFa; iFa++) {
+        mesh.fa[iFa].iM = iM;
+        auto ctmp = mesh.fa[iFa].name;
+        for (int i = 0; i < iM; i++) {
+          for (int j = 0; j < com_mod.msh[i].nFa; j++) {
+            if ((ctmp == com_mod.msh[i].fa[j].name) && ((i != iM || j != iFa))) { 
+              throw std::runtime_error("The face name '" + ctmp + "' is duplicated."); 
+            }
+          }
         } 
       } 
-    } 
-  } 
 
-  // Check for fiber mesh.
-  //
-  for (int iM = 0; iM < com_mod.nMsh; iM++) {
-    auto& mesh = com_mod.msh[iM];
-    if (mesh.lFib) {
-      if (mesh.eType != consts::ElementType::LIN1 && mesh.eType != consts::ElementType::LIN2) { 
-        throw std::runtime_error("Fiber elements must be either linear quadratic.");
+      // Global total number of nodes.
+      com_mod.gtnNo += mesh.gnNo;
+      #ifdef debug_read_msh 
+      dmsg << "Global total number of nodes (gtnNo): " << com_mod.gtnNo;
+      #endif
+
+      // Check modified quadrature formula for consts::ElementType::TET4.
+      mesh.qmTET4 = param->quadrature_modifier_TET4();
+      if (mesh.qmTET4 < (1.0/4.0) || mesh.qmTET4 > 1.0) {
+        throw std::runtime_error("Quadrature_modifier_TET4 must be in the range [1/4, 1].");
       }
     }
-  }
+
+    // Create global nodal coordinate array. 
+    //
+    // Scale the nodal coordinates. 
+    //
+    gX.resize(com_mod.nsd, com_mod.gtnNo);
+    int n = 0;
   
-  // [NOTE] We are not processing resetSim here.
-  /*
-  ELSE
-    ALLOCATE(gX(nsd,gtnNo))
-    gX = x
-    DO iM=1, nMsh
-      CALL SELECTELE(msh(iM))
-      ALLOCATE(msh(iM)%gN(msh(iM)%gnNo))
-      msh(iM)%gN = 0
-    END DO
-  END IF ! resetSim
-*/
+    for (auto& mesh : com_mod.msh) {
+      for (int i = 0; i < mesh.gnNo; i++) {
+        for (int j = 0; j < com_mod.nsd; j++) {
+          gX(j,n) = mesh.scF * mesh.x(j,i); 
+        }
+      n += 1;
+      }
+      mesh.x.clear();
+    }
+
+    com_mod.x = gX;
+
+    // Check for shell elements.
+    //
+    for (int iM = 0; iM < com_mod.nMsh; iM++) {
+      auto& mesh = com_mod.msh[iM];
+      if (mesh.lShl) {
+        if (mesh.eType != consts::ElementType::NRB && mesh.eType != consts::ElementType::TRI3) {
+          throw std::runtime_error("Shell elements must be triangles or C1-NURBS.");
+        }
+
+        if (mesh.eType == consts::ElementType::NRB) {
+          for (int i = 0; i < com_mod.nsd-1; i++) {
+            if (mesh.bs[i].p <= 1) {
+              throw std::runtime_error("NURBS for shell elements must have be p > 1.");
+            } 
+          } 
+        } 
+
+        if (mesh.eType == consts::ElementType::TRI3) {
+          if (!com_mod.cm.seq()) { 
+            throw std::runtime_error("Shells with linear triangles should be run sequentially.");
+          } 
+        } 
+
+      } 
+    } 
+
+    // Check for fiber mesh.
+    //
+    for (int iM = 0; iM < com_mod.nMsh; iM++) {
+      auto& mesh = com_mod.msh[iM];
+      if (mesh.lFib) {
+        if (mesh.eType != consts::ElementType::LIN1 && mesh.eType != consts::ElementType::LIN2) { 
+          throw std::runtime_error("Fiber elements must be either linear quadratic.");
+        }
+      }
+    }
+
+ // Allocate new mesh nodes or something.
+ //
+ } else {
+    #ifdef debug_read_msh 
+    dmsg << "Allocate new mesh nodes or something " << " ...";
+    dmsg << "com_mod.gtnNo: " << com_mod.gtnNo;
+    #endif
+    gX.resize(com_mod.nsd,com_mod.gtnNo);
+    gX = com_mod.x;
+
+    for (int iM = 0; iM < com_mod.nMsh; iM++) {
+      auto& msh = com_mod.msh[iM];
+      #ifdef debug_read_msh 
+      dmsg << "msh.dname: " << msh.dname;
+      dmsg << "msh.gnNo: " << msh.gnNo;
+      dmsg << "msh.eNoN: " << msh.eNoN;
+      dmsg << "msh.gnEl: " << msh.gnEl;
+      #endif
+
+      nn::select_ele(com_mod, msh);
+      msh.gN.resize(msh.gnNo);
+      msh.gN = -1;
+    }
+  } 
 
   // Examining the existance of projection faces and setting %gN.
   // Reseting gtnNo and recounting nodes that are not duplicated
@@ -1143,26 +1317,29 @@ void read_msh(Simulation* simulation)
     }
   }
 
+  #ifdef debug_read_msh 
+  dmsg << "Allocate com_mod.x " << " ...";
+  dmsg << "com_mod.gtnNo: " << com_mod.gtnNo;
+  #endif
   com_mod.x = Array<double>(com_mod.nsd, com_mod.gtnNo);
 
   if (avNds.n != 0) {
     throw std::runtime_error("There are " + std::to_string(avNds.n) + " nodes not associated other faces.");
   }
 
-  #ifdef debug_read_msh 
-  dmsg << "com_mod.gtnNo: " << com_mod.gtnNo;
-  #endif
 
   // Temporarily allocate msh%lN array. This is necessary for BCs and
   // will later be deallocated in DISTRIBUTE
   //
   #ifdef debug_read_msh 
-  dmsg << "Temporarily allocate msh%lN array ... " ;
+  dmsg << " " << " " ;
+  dmsg << "Temporarily allocate msh%lN array ... "  << " ";
   #endif
 
   for (int iM = 0; iM < com_mod.nMsh; iM++) {
     com_mod.msh[iM].lN = Vector<int>(com_mod.gtnNo);
     com_mod.msh[iM].lN = -1;
+
     for (int a = 0; a < com_mod.msh[iM].gnNo; a++ ) {
       int Ac = com_mod.msh[iM].gN[a];
       com_mod.msh[iM].lN[Ac] = a;
@@ -1173,9 +1350,8 @@ void read_msh(Simulation* simulation)
   // First rearrange 2D/3D mesh and then, 1D fiber mesh
   //
   #ifdef debug_read_msh 
-  dmsg << "Re-arranging x ..." ;
+  dmsg << "Re-arranging x " << "...";
   #endif
-
   std::vector<bool> ichk(com_mod.gtnNo);
   std::fill(ichk.begin(), ichk.end(), false);
   int b = 0;
@@ -1185,6 +1361,12 @@ void read_msh(Simulation* simulation)
   maxX = -std::numeric_limits<double>::max();
 
   for (int iM = 0; iM < com_mod.nMsh; iM++) {
+    #ifdef debug_read_msh 
+    dmsg << " " << " "; 
+    dmsg << "---------- iM: " << iM+1; 
+    dmsg << "com_mod.msh[iM].gnNo: " << com_mod.msh[iM].gnNo; 
+    dmsg << "msh[iM].lFib: " << com_mod.msh[iM].lFib;
+    #endif
     if (com_mod.msh[iM].lFib) {
       b = b + com_mod.msh[iM].gnNo;
       continue;
@@ -1196,6 +1378,7 @@ void read_msh(Simulation* simulation)
 
       for (int i = 0; i < com_mod.nsd; i++) {
         com_mod.x(i,Ac) = gX(i,b);
+
         if (maxX[i] < com_mod.x(i,Ac)) {
           maxX[i] = com_mod.x(i,Ac);
         }
@@ -1206,10 +1389,21 @@ void read_msh(Simulation* simulation)
 
       b  = b + 1;
     } 
+
+    #ifdef debug_read_msh 
+    dmsg << "b: " << b+1;
+    #endif
   } 
 
   b = 0;
+
   for (int iM = 0; iM < com_mod.nMsh; iM++) {
+    #ifdef debug_read_msh 
+    dmsg << " " << " "; 
+    dmsg << "---------- iM: " << iM+1; 
+    dmsg << "msh[iM].lFib: " << com_mod.msh[iM].lFib;
+    #endif
+
     if (!com_mod.msh[iM].lFib) {
       b = b + com_mod.msh[iM].gnNo;
       continue;
@@ -1217,11 +1411,15 @@ void read_msh(Simulation* simulation)
 
     for (int a = 0; a < com_mod.msh[iM].gnNo; a++) {
       int Ac = com_mod.msh[iM].gN[a];
+
       if (ichk[Ac]) {
+        b = b + 1;
         continue; 
       }
+
       for (int i = 0; i < com_mod.nsd; i++) {
         com_mod.x(i,Ac) = gX(i,b);
+
         if (maxX[i] < com_mod.x(i,Ac)) {
           maxX[i] = com_mod.x(i,Ac);
         }
@@ -1232,6 +1430,10 @@ void read_msh(Simulation* simulation)
 
       b  = b + 1;
     }
+
+    #ifdef debug_read_msh 
+    dmsg << "b: " << b+1;
+    #endif
   }
 
   #ifdef debug_read_msh 
@@ -1263,49 +1465,54 @@ void read_msh(Simulation* simulation)
     }  
   }  
 
-  // [NOTE] Not implemented. 
-/*
-  if (resetSim) {
-    int lDof = size(rmsh%Y0,1)
-    int lnNo = size(rmsh%Y0,2)
+  if (com_mod.resetSim) {
+    auto& rmsh = com_mod.rmsh;
+    int gtnNo = com_mod.gtnNo;
+    int lDof = rmsh.Y0.nrows();
+    int lnNo = rmsh.Y0.ncols();
+
     if (lnNo != gtnNo) {
-      ALLOCATE(tmpA(lDof,lnNo))
-      ALLOCATE(tmpY(lDof,lnNo))
-      ALLOCATE(tmpD(lDof,lnNo))
-      tmpA = rmsh%A0
-      tmpY = rmsh%Y0
-      tmpD = rmsh%D0
-      DEALLOCATE(rmsh%A0,rmsh%Y0,rmsh%D0)
-      ALLOCATE(rmsh%A0(lDof,gtnNo))
-      ALLOCATE(rmsh%Y0(lDof,gtnNo))
-      ALLOCATE(rmsh%D0(lDof,gtnNo))
-      int b = 0
-      DO iM=1, nMsh
-        DO a=1, msh(iM)%gnNo
-          b = b + 1
-          Ac = msh(iM)%gpN(a)
-          DO i=1, lDof
-            rmsh%A0(i,Ac) = tmpA(i,b)
-            rmsh%Y0(i,Ac) = tmpY(i,b)
-            rmsh%D0(i,Ac) = tmpD(i,b)
-          END DO
-        END DO
-      END DO
-    END IF ! lnNo < gtnNo
-  END IF ! resetSim
-*/
+      Array<double> tmpA(lDof,lnNo);
+      Array<double> tmpY(lDof,lnNo);
+      Array<double> tmpD(lDof,lnNo);
+      tmpA = rmsh.A0;
+      tmpY = rmsh.Y0;
+      tmpD = rmsh.D0;
+
+      rmsh.A0.resize(lDof,gtnNo);
+      rmsh.Y0.resize(lDof,gtnNo);
+      rmsh.D0.resize(lDof,gtnNo);
+      int b = 0;
+
+      for (int iM = 0; iM < com_mod.nMsh; iM++) {
+        auto& msh = com_mod.msh[iM];
+
+        for (int a = 0; a < msh.gnNo; a++) {
+          int Ac = msh.gpN(a);
+
+          for (int i = 0; i < lDof; i++) {
+            rmsh.A0(i,Ac) = tmpA(i,b);
+            rmsh.Y0(i,Ac) = tmpY(i,b);
+            rmsh.D0(i,Ac) = tmpD(i,b);
+          } 
+
+          b = b + 1;
+        }
+      }
+    } 
+  } 
 
   // Setting dmnId parameter here, if there is at least one mesh that
   // has defined eId.
   //
   #ifdef debug_read_msh 
-  dmsg << "Setting dmnId parameter ... " << std::endl;
+  dmsg << "Setting dmnId parameter " << "...";
   #endif
   bool flag = false;
 
   for (int iM = 0; iM < com_mod.nMsh; iM++) {
     #ifdef debug_read_msh 
-    dmsg << " ----- iM " << iM << " -----";
+    dmsg << "---------- iM " << iM;
     #endif
     auto mesh_param = simulation->parameters.mesh_parameters[iM];
 
@@ -1340,6 +1547,10 @@ void read_msh(Simulation* simulation)
       flag = true;
     }
   }
+
+  #ifdef debug_read_msh 
+  dmsg << "flag: " << flag;
+  #endif
 
   if (flag) {
     auto& dmnId = com_mod.dmnId;
@@ -1472,33 +1683,41 @@ void read_msh(Simulation* simulation)
 
   // Read contact model parameters.
   //
-  // [NOTE] Implement this, no tests yet.
-  //
   if (!com_mod.resetSim) {
     com_mod.iCntct = false;
-    //lPM => list%get(ctmp, "Contact model")
-    /*
-    IF (ASSOCIATED(lPM)) THEN
-      iCntct = .TRUE.
-      SELECT CASE (TRIM(ctmp))
-      CASE ("penalty")
-        cntctM%cType = cntctM_penalty
-        lPtr => lPM%get(cntctM%k,
-     2            "Penalty constant (k)", 1, ll=0._RKIND)
-        lPtr => lPM%get(cntctM%h,
-     2            "Desired separation (h)", 1, lb=0._RKIND)
-        lPtr => lPM%get(cntctM%c,
-     2            "Closest gap to activate penalty (c)", 1, lb=0._RKIND)
-        IF (cntctM%c .LT. cntctM%h) err =
-     2            "Choose c > h for proper contact penalization"
-        lPtr => lPM%get(cntctM%al,
-     2            "Min norm of face normals (alpha)",1,lb=0._RKIND,
-     3  ub=1._RKIND)
-      CASE DEFAULT
-        err = "Undefined contact model"
-      END SELECT
-    END IF
-    */
+    auto& cntctM = com_mod.cntctM;
+    auto& contact_params = simulation->parameters.contact_parameters;
+
+    if (contact_params.model.defined()) {
+      auto contact_model = contact_params.model.value();
+      com_mod.iCntct = true;
+
+      try {
+        cntctM.cType = consts::contact_model_name_to_type.at(contact_model);
+      } catch (const std::out_of_range& exception) {
+        throw std::runtime_error("Unknown contact model '" + contact_model + "'.");
+      }
+
+      switch (cntctM.cType) {
+
+        case consts::ContactModelType::cntctM_penalty:
+          cntctM.k = contact_params.penalty_constant.value();
+	  cntctM.h = contact_params.desired_separation.value();
+	  cntctM.c = contact_params.closest_gap_to_activate_penalty.value();
+	  cntctM.al = contact_params.min_norm_of_face_normals.value();
+
+          if (cntctM.c < cntctM.h) {
+            throw std::runtime_error("The contact Closest_gap_to_activate_penalty " + std::to_string(cntctM.c)  + 
+              " must be > the desired separation " + std::to_string(cntctM.h) + "."); 
+          }
+        break;
+
+        default:
+          throw std::runtime_error("Contact model '" + contact_model + "' is not implemented.");
+        break;
+      }
+
+    }
   }
 }
 
@@ -1592,6 +1811,12 @@ void set_dmn_id_vtk(Simulation* simulation, mshType& mesh, const std::string& fi
 //
 void set_projector(Simulation* simulation, utils::stackType& avNds)
 {
+  #define n_debug_set_projector 
+  #ifdef debug_set_projector
+  DebugMsg dmsg(__func__, simulation->com_mod.cm.idcm());
+  dmsg.banner();
+  #endif
+
   auto& com_mod = simulation->get_com_mod();
   int nPrj = simulation->parameters.projection_parameters.size();
 
@@ -1614,6 +1839,9 @@ void set_projector(Simulation* simulation, utils::stackType& avNds)
   }
   std::vector<utils::stackType> stk(nStk);
   utils::stackType lPrj;
+  #ifdef debug_set_projector
+  dmsg << "nStk: " << nStk;
+  #endif
 
   // Match the nodal coordinates for each projection face.
   //
@@ -1622,11 +1850,21 @@ void set_projector(Simulation* simulation, utils::stackType& avNds)
     auto ctmpi = params->name();
     all_fun::find_face(com_mod.msh, ctmpi, iM, iFa);
     auto& face1 = com_mod.msh[iM].fa[iFa];
+    #ifdef debug_set_projector
+    dmsg << "iM: " << iM;
+    dmsg << "iFa: " << iFa;
+    dmsg << "face1.name: " << face1.name;
+    #endif
 
     int jM, jFa;
     auto ctmpj = params->project_from_face();
     all_fun::find_face(com_mod.msh, ctmpj, jM, jFa);
     auto& face2 = com_mod.msh[jM].fa[jFa];
+    #ifdef debug_set_projector
+    dmsg << "jM: " << jM;
+    dmsg << "jFa: " << jFa;
+    dmsg << "face2.name: " << face2.name;
+    #endif
 
     double tol = params->projection_tolerance();
 
@@ -1656,6 +1894,7 @@ void set_projector(Simulation* simulation, utils::stackType& avNds)
           }
           com_mod.msh[iM].gN[ia] = k;
           com_mod.msh[jM].gN[ja] = k;
+
           push_stack(stk[k], {iM,ia,jM,ja});
 
         // This is the case one of them has already been assigned. So just using that value for the other one

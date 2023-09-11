@@ -73,6 +73,22 @@ mat_det(const Array<double>& A, const int nd)
   return D;
 }
 
+//---------
+// mat_dev
+//---------
+//
+Array<double> 
+mat_dev(const Array<double>& A, const int nd)
+{
+  Array<double> result(nd,nd);
+
+  double trA = mat_trace(A,nd);
+
+  result = A - (trA / static_cast<double>(nd)) * mat_id(nd);
+
+  return result;
+}
+
 //---------------
 // mat_dyad_prod
 //---------------
@@ -114,7 +130,7 @@ mat_id(const int nd)
 // This function computes inverse of a square matrix
 //
 Array<double> 
-mat_inv(const Array<double>& A, const int nd)
+mat_inv(const Array<double>& A, const int nd, bool debug)
 {
   int iok = 0;
   Array<double> Ainv(nd,nd);
@@ -155,7 +171,7 @@ mat_inv(const Array<double>& A, const int nd)
     if (utils::is_zero(fabs(d))) {
       iok = -1;
     }
-    Ainv = mat_inv_ge(A, nd);
+    Ainv = mat_inv_ge(A, nd, debug);
 
   } else {
     Ainv = mat_inv_lp(A, nd);
@@ -173,8 +189,150 @@ mat_inv(const Array<double>& A, const int nd)
 //------------
 // This function computes inverse of a square matrix using Gauss Elimination method
 //
+Array<double>
+mat_inv_ge(const Array<double>& Ain, const int n, bool debug)
+{
+  Array<double> A(n,n);
+  Array<double> B(n,n);
+  A = Ain;
+
+  if (debug) {
+    std::cout << "[mat_inv_ge] ========== mat_inv_ge =========" << std::endl;
+    if (std::numeric_limits<double>::is_iec559) {
+      std::cout << "[mat_inv_ge] is_iec559 " << std::endl;
+    }
+  }
+
+  // Auxillary matrix
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      B(i,j) = 0.0;
+    }
+    B(i,i) = 1.0;
+  }
+
+  // Loop over columns of A to find a good pivot. 
+  //
+  double max_val = 0.0; 
+  int irow = 0;
+  double d = 0.0; 
+
+  if (debug) {
+    A.print("A");
+  }
+
+  for (int i = 0; i < n; i++) {
+    if (debug) {
+      std::cout << "[mat_inv_ge] " << std::endl;
+      std::cout << "[mat_inv_ge] ---------- i: " << i+1 << std::endl;
+      A.print("A");
+    }
+    double max_val = fabs(A(i,i));
+    irow = i;
+
+    for (int j = i; j < n; j++) {
+      //if (debug) {
+       // std::cout << "[mat_inv_ge] A(j,i): " << A(j,i) << std::endl;
+        //std::cout << "[mat_inv_ge] max_val: " << max_val << std::endl;
+      //}
+      if (fabs(A(j,i)) > max_val) {
+        max_val = fabs(A(j,i));
+        irow = j;
+      }
+    }
+
+    if (debug) {
+      std::cout << "[mat_inv_ge] max_val: " << max_val << std::endl;
+      std::cout << "[mat_inv_ge] irow: " << irow+1 << std::endl;
+    }
+
+    // Interchange rows.
+    //
+    if (max_val > fabs(A(i,i))) {
+      if (debug) {
+        std::cout << "[mat_inv_ge] " << std::endl;
+        std::cout << "[mat_inv_ge] Interchange rows " << std::endl;
+      }
+
+      for (int k = 0; k < n; k++) {
+        d = A(i,k);
+        A(i,k) = A(irow,k);
+        A(irow,k) = d;
+
+        d = B(i,k) ;
+        B(i,k) = B(irow,k);
+        B(irow,k) = d;
+      }
+    }
+
+    d = A(i,i);
+
+    if (debug) {
+      std::cout << "[mat_inv_ge]  " << std::endl;
+      std::cout << "[mat_inv_ge]  Scale ..." << std::endl;
+      std::cout << "[mat_inv_ge] d: " << d << std::endl;
+    }
+
+    for (int j = 0; j < n; j++) {
+      A(i,j) = A(i,j) / d;
+      B(i,j) = B(i,j) / d;
+    }
+
+    if (debug) {
+      std::cout << "[mat_inv_ge]  " << std::endl;
+      std::cout << "[mat_inv_ge]  Reduce ..." << std::endl;
+    }
+
+    for (int j = i+1; j < n; j++) {
+      d = A(j,i);
+
+      if (debug) {
+        std::cout << "[mat_inv_ge]  " << std::endl;
+        std::cout << "[mat_inv_ge]  j: " << j+1 << std::endl;
+        std::cout << "[mat_inv_ge]  d: " << d << std::endl;
+      }
+
+      for (int k = 0; k < n; k++) {
+        A(j,k) = A(j,k) - d*A(i,k);
+        B(j,k) = B(j,k) - d*B(i,k);
+      }
+    }
+  }
+
+  if (debug) {
+    std::cout << "[mat_inv_ge]  " << std::endl;
+    std::cout << "[mat_inv_ge] Final reduce ..." << std::endl;
+  }
+
+  for (int i = 0; i < n-1; i++) {
+    for (int j = i+1; j < n; j++) {
+      d = A(i,j);
+      if (debug) {
+        std::cout << "[mat_inv_ge] i j " << i+1 << " " << j+1 << std::endl;
+        std::cout << "[mat_inv_ge] d: " << d << std::endl;
+      }
+      for (int k = 0; k < n; k++) {
+        A(i,k) = A(i,k) - d*A(j,k);
+        B(i,k) = B(i,k) - d*B(j,k);
+        if (debug) {
+          std::cout << "[mat_inv_ge] B(i,k): " << B(i,k) << std::endl;
+        }
+      }
+    }
+  }
+
+  return B;
+}
+
+//------------
+// mat_inv_ge
+//------------
+// This function computes inverse of a square matrix using Gauss Elimination method
+//
+// [TODO:DaveP] The original version sometimes produced NaNs.
+//
 Array<double> 
-mat_inv_ge(const Array<double>& A, const int nd)
+mat_inv_ge_orig(const Array<double>& A, const int nd, bool debug)
 {
   Array<double> B(nd,2*nd);
   Array<double> Ainv(nd,nd);
@@ -198,13 +356,45 @@ mat_inv_ge(const Array<double>& A, const int nd)
     }
   }
 
+  if (debug) {
+    std::cout << "[mat_inv]  " << std::endl;
+    std::cout << "[mat_inv] B: " << B << std::endl;
+    std::cout << "[mat_inv]  " << std::endl;
+  }
+
   // Do row-column operations and reduce to diagonal
+  double d;
+
   for (int i = 0; i < nd; i++) { 
+    if (debug) {
+      std::cout << "[mat_inv] ========== i " << i+1 << " ==========" << std::endl;
+    }
     for (int j = 0; j < nd; j++) { 
+      if (debug) {
+        std::cout << "[mat_inv] ########## j " << j+1 << " ##########" << std::endl;
+      }
       if (j != i) {
-        double d = B(j,i) / B(i,i);
+        d = B(j,i) / B(i,i);
+        if (debug) {
+          std::cout << "[mat_inv] B(j,i): " << B(j,i) << std::endl;
+          std::cout << "[mat_inv] B(i,i): " << B(i,i) << std::endl;
+          std::cout << "[mat_inv] d: " << d << std::endl;
+          std::cout << "[mat_inv]  " << std::endl;
+        }
         for (int k = 0; k < 2*nd; k++) { 
+          if (debug) {
+            std::cout << "[mat_inv] ------- k " << k+1 << " -------" << std::endl;
+          }
+          if (debug) {
+            std::cout << "[mat_inv] B(j,k): " << B(j,k) << std::endl;
+            std::cout << "[mat_inv] B(i,k): " << B(i,k) << std::endl;
+            std::cout << "[mat_inv] d: " << d << std::endl;
+            std::cout << "[mat_inv] d*B(i,k): " << d*B(i,k) << std::endl;
+          }
           B(j,k) = B(j,k) - d*B(i,k);
+          if (debug) {
+            std::cout << "[mat_inv] B(j,k): " << B(j,k) << std::endl;
+          }
         }
       }
     }
@@ -238,10 +428,10 @@ mat_inv_ge(const Array<double>& A, const int nd)
 Array<double> 
 mat_inv_lp(const Array<double>& A, const int nd)
 {
-  Array<double> Ad(nd, nd);
   Vector<int> IPIV(nd);
   int iok;
   int n = nd;
+  auto Ad = A;
 
   dgetrf_(&n, &n, Ad.data(), &n, IPIV.data(), &iok);
 
@@ -340,7 +530,7 @@ mat_mul(const Array<double>& A, const Vector<double>& v)
 //---------
 // mat_mul
 //---------
-// Multiply a matrix by a vector.
+// Multiply a matrix by a matrix.
 //
 // Reproduces Fortran MATMUL.
 //
@@ -375,6 +565,8 @@ mat_mul(const Array<double>& A, const Array<double>& B)
 //---------
 // mat_mul
 //---------
+// Multiply a matrix by a matrix.
+//
 // Compute result directly into the passed argument.
 //
 void mat_mul(const Array<double>& A, const Array<double>& B, Array<double>& result)
@@ -400,6 +592,25 @@ void mat_mul(const Array<double>& A, const Array<double>& B, Array<double>& resu
       result(i,j) = sum;
     }
   }
+}
+
+//---------
+// mat_sym
+//---------
+// Symmetric part of a matrix, S = (A + A.T)/2
+//
+Array<double> 
+mat_symm(const Array<double>& A, const int nd)
+{
+  Array<double> S(nd, nd);
+
+  for (int i = 0; i < nd; i++) { 
+    for (int j = 0; j < nd; j++) { 
+      S(i,j) = 0.5* (A(i,j) + A(j,i));
+    }
+  }
+
+  return S;
 }
 
 
@@ -436,6 +647,32 @@ double mat_trace(const Array<double>& A, const int nd)
   }
 
   return result;
+}
+
+//-----------------
+// ten_asym_prod12
+//-----------------
+// Create a 4th order tensor from antisymmetric outer product of
+// two matrices
+//
+//   Cijkl = Aij*Bkl-Ail*Bjk
+//
+Tensor4<double> 
+ten_asym_prod12(const Array<double>& A, const Array<double>& B, const int nd)
+{
+  Tensor4<double> C(nd,nd,nd,nd);
+
+  int nn = pow(nd,4);
+
+  for (int ii = 0; ii < nn; ii) { 
+    int i = t_ind(0,ii);
+    int j = t_ind(1,ii);
+    int k = t_ind(2,ii);
+    int l = t_ind(3,ii);
+    C(i,j,k,l) = 0.5 * ( A(i,j)*B(k,l) - A(i,l)*B(j,k) );
+  }
+
+  return C;
 }
 
 //----------
@@ -652,6 +889,39 @@ ten_ids(const int nd)
 
   return A;
 }
+
+//-----------
+// ten_mddot
+//-----------
+// Double dot product of a 4th order tensor and a 2nd order tensor
+//
+//   C_ij = (A_ijkl * B_kl)
+//
+Array<double> 
+ten_mddot(const Tensor4<double>& A, const Array<double>& B, const int nd) 
+{
+  Array<double> C(nd,nd);
+
+  if (nd == 2) {
+    for (int i = 0; i < nd; i++) {
+      for (int j = 0; j < nd; j++) {
+        C(i,j) = A(i,j,0,0)*B(0,0) + A(i,j,0,1)*B(0,1) + A(i,j,1,0)*B(1,0) + A(i,j,1,1)*B(1,1);
+      }
+    }
+
+  } else { 
+    for (int i = 0; i < nd; i++) {
+      for (int j = 0; j < nd; j++) {
+        C(i,j) = A(i,j,0,0)*B(0,0) + A(i,j,0,1)*B(0,1) + A(i,j,0,2)*B(0,2) + A(i,j,1,0)*B(1,0) + 
+            A(i,j,1,1)*B(1,1) + A(i,j,1,2)*B(1,2) + A(i,j,2,0)*B(2,0) + A(i,j,2,1)*B(2,1) + 
+            A(i,j,2,2)*B(2,2);
+        }
+     }
+  }
+
+  return C;
+}
+
 
 //---------------
 // ten_symm_prod
