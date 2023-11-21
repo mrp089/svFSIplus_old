@@ -518,6 +518,58 @@ void load_fiber_direction_vtu(const std::string& file_name, const std::string& d
   }
 }
 
+/// @brief Read variable wall properties for growth and remodeling models
+void load_gr_properties_vtu(const std::string& file_name, const std::string& data_name, mshType& mesh)
+{
+  #ifdef debug_load_fiber_direction_vtu
+  std::cout << "[load_fiber_direction_vtu] " << std::endl;
+  std::cout << "[load_fiber_direction_vtu] ===== vtk_xml_parser::load_fiber_direction_vtu ===== " << std::endl;
+  #endif
+  using namespace vtk_xml_parser;
+
+  if (FILE *file = fopen(file_name.c_str(), "r")) {
+      fclose(file);
+  } else {
+    throw std::runtime_error("The fiber direction VTK file '" + file_name + "' can't be read.");
+  }
+
+  auto reader = vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
+  reader->SetFileName(file_name.c_str());
+  reader->Update();
+  vtkSmartPointer<vtkUnstructuredGrid> vtk_ugrid = reader->GetOutput();
+
+  vtkIdType num_nodes = vtk_ugrid->GetNumberOfPoints();
+  if (num_nodes == 0) {
+    throw std::runtime_error("Failed reading the VTK file '" + file_name + "'.");
+  }
+
+  vtkIdType num_elems = vtk_ugrid->GetNumberOfCells();
+  if (mesh.gnEl != num_elems) {
+    throw std::runtime_error("The number of elements (" + std::to_string(num_elems) +
+        ") in the fiber direction VTK file '" + file_name + "' is not equal to the number of elements ("
+        + std::to_string(mesh.gnEl) + ") for the mesh named '" + mesh.name + "'.");
+  }
+
+  // Get the wall properties data
+  auto wall_data = vtkDoubleArray::SafeDownCast(vtk_ugrid->GetPointData()->GetArray(data_name.c_str()));
+  if (wall_data == nullptr) {
+    throw std::runtime_error("No '" + data_name + "' data found in the fiber direction VTK file '" + file_name + "'");
+  }
+
+  // Initialize array
+  int num_comps = wall_data->GetNumberOfComponents();
+  mesh.wall_props = Array<double>(num_comps, num_nodes);
+  mesh.wall_props = 0.0;
+
+  // Fill array with components
+  for (int n = 0; n < mesh.gnNo; n++) {
+    auto wall_prop = wall_data->GetTuple(n);
+    for (int i = 0; i < num_comps; i++) {
+      mesh.wall_props(i, n) = wall_prop[i];
+    }
+  }
+}
+
 /// @brief Store a surface mesh read from a VTK .vtp file into a Face object.
 //
 void load_vtp(const std::string& file_name, faceType& face)

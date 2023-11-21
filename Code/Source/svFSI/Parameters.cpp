@@ -2012,6 +2012,7 @@ MeshParameters::MeshParameters()
 
   //set_parameter("Fiber_direction", {}, !required, fiber_direction);
   set_parameter("Fiber_direction_file_path", {}, !required, fiber_direction_file_paths);
+  set_parameter("GR_properties_file_path", {}, !required, gr_properties_file_path);
 
   set_parameter("Mesh_file_path", "", !required, mesh_file_path);
   set_parameter("Mesh_scale_factor", 1.0, !required, mesh_scale_factor);

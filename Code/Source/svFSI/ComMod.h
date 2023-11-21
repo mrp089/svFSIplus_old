@@ -930,6 +930,9 @@ class mshType
     /// electrophysiology and solid mechanics
     Array<double> fN;
 
+    /// @brief Wall properties stored at the node level
+    Array<double> wall_props;
+
     /// @brief Parent shape functions gradient
     /// double Nx(:,:,:)
     Array3<double> Nx;

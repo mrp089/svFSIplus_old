@@ -1294,6 +1294,9 @@ class MeshParameters : public ParameterLists
     std::vector<VectorParameter<double>> fiber_directions;
     //VectorParameter<double> fiber_direction;
 
+    Parameter<std::string> gr_properties_file_path;
+    std::vector<VectorParameter<double>> gr_properties;
+
     Parameter<std::string> initial_displacements_file_path;
     Parameter<std::string> initial_pressures_file_path;
     Parameter<bool> initialize_rcr_from_flow;
