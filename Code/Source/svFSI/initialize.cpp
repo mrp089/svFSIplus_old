@@ -602,6 +602,12 @@ void initialize(Simulation* simulation, Vector<double>& timeP)
     }
   }
 
+  // Growth and remodeling
+  if(com_mod.grEq == true) {
+    // Initialize array for G&R internal variables stored at the Gauss point
+    com_mod.grInt.resize(com_mod.tDof,com_mod.tnNo,com_mod.msh[0].nG);
+  }
+
   // Setup data for remeshing.
   //
   auto& rmsh = com_mod.rmsh;

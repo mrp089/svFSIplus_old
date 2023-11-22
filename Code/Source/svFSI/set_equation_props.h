@@ -594,6 +594,16 @@ SetEquationPropertiesMapType set_equation_props = {
   // Set solver parameters.
   read_ls(simulation, eq_params, SolverType::lSolver_CG, lEq);
 
+  // Set properties for growth and remodeling
+  int cEq = com_mod.cEq;
+  auto& eq = com_mod.eq[cEq];
+  int cDmn = com_mod.cDmn;
+  auto& dmn = eq.dmn[cDmn];
+
+  if (dmn.stM.isoType == ConstitutiveModelType::GR_equi) {
+    com_mod.grEq = true;
+  }
+
 } },
 
 //---------------------------//

@@ -1367,6 +1367,9 @@ class ComMod {
     /// @brief Whether velocity-pressure based structural dynamics solver is used
     bool sstEq = false;
 
+    /// @brief Whether growth and remodeling is being solved
+    bool grEq = false;
+
     /// @brief Whether to detect and apply any contact model
     bool iCntct = false;
 
@@ -1524,6 +1527,9 @@ class ComMod {
 
     /// @brief Body force
     Array<double>  Bf;
+
+    /// @brief Internal growth and remodeling variables
+    Array3<double> grInt;
 
     //-----------------------------------------------------
     // Additional arrays for velocity-based formulation of 
