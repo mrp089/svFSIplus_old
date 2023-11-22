@@ -104,6 +104,7 @@ set(CSRCS
   fsi.h fsi.cpp
   fs.h fs.cpp
   fft.h fft.cpp
+  gr_equilibrated.cpp
   heatf.h heatf.cpp
   heats.h heats.cpp
   initialize.h initialize.cpp
@@ -209,4 +210,11 @@ if(ENABLE_COVERAGE)
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 
+# todo mrp: remove and replace with internal functions
+set(SV_FEBIO_DIR "${SV_SOURCE_DIR}/ThirdParty/febio/")
+set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/eig3.cpp)
+set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/mat3d.cpp)
+set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/stdafx.cpp)
+set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/tens3d.cpp)
+set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/tens4d.cpp)
 

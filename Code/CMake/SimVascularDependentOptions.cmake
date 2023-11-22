@@ -92,3 +92,9 @@ else()
   set(GLOBAL_DEFINES "${GLOBAL_DEFINES} -DSV_STATIC_LINK -DSV_STATIC_BUILD")
   set(SV_STATIC_BUILD "1")
 endif()
+
+
+#-----------------------------------------------------------------------------
+# febio (to be replaced by internal functions)
+set(SV_FEBIO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/febio/")
+include_directories(${SV_FEBIO_DIR})
