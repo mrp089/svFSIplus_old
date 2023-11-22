@@ -174,4 +174,13 @@ SeMaterialPropertiesMapType set_material_props = {
 
 } },
 
+{consts::ConstitutiveModelType::GR_equi, [](DomainParameters* domain_params, double mu, double kap, double lam,
+    dmnType& lDmn) -> void
+{
+  lDmn.stM.isoType = consts::ConstitutiveModelType::GR_equi;
+  auto& params = domain_params->constitutive_model.gr_equilibrated;
+
+  // todo mrp: add parameters
+} },
+
 };

@@ -464,6 +464,7 @@ const std::string ConstitutiveModelParameters::HGO_MODEL = "HGO";
 const std::string ConstitutiveModelParameters::LEE_SACKS = "Lee-Sacks";
 const std::string ConstitutiveModelParameters::NEOHOOKEAN_MODEL = "neoHookean";
 const std::string ConstitutiveModelParameters::STVENANT_KIRCHHOFF_MODEL = "stVenantKirchhoff";
+const std::string ConstitutiveModelParameters::GR_EQUILIBRATED = "GR_equilibrated";
 
 /// @brief Supported constitutive model types and their aliases.
 const std::map<std::string, std::string> ConstitutiveModelParameters::constitutive_model_types = {
@@ -479,6 +480,8 @@ const std::map<std::string, std::string> ConstitutiveModelParameters::constituti
 
   {ConstitutiveModelParameters::STVENANT_KIRCHHOFF_MODEL, ConstitutiveModelParameters::STVENANT_KIRCHHOFF_MODEL},
   {"stVK",                                                ConstitutiveModelParameters::STVENANT_KIRCHHOFF_MODEL},
+
+  {"GR_equilibrated", ConstitutiveModelParameters::GR_EQUILIBRATED}
 }; 
 
 /// @brief Define a map to set the parameters for each constitutive model.
@@ -492,6 +495,7 @@ SetConstitutiveModelParamMapType SetConstitutiveModelParamMap = {
   {ConstitutiveModelParameters::LEE_SACKS, [](CmpType cp, CmpXmlType params) -> void {cp->lee_sacks.set_values(params);}},
   {ConstitutiveModelParameters::NEOHOOKEAN_MODEL, [](CmpType cp, CmpXmlType params) -> void {cp->neo_hookean.set_values(params);}},
   {ConstitutiveModelParameters::STVENANT_KIRCHHOFF_MODEL, [](CmpType cp, CmpXmlType params) -> void {cp->stvenant_kirchhoff.set_values(params);}},
+  {ConstitutiveModelParameters::GR_EQUILIBRATED, [](CmpType cp, CmpXmlType params) -> void {cp->gr_equilibrated.set_values(params);}}
 };
 
 /// @brief Define a map to print parameters for each constitutive model.
@@ -503,6 +507,7 @@ PrintConstitutiveModelParamMapType PrintConstitutiveModelParamMap = {
   {ConstitutiveModelParameters::LEE_SACKS, [](CmpType cp) -> void {cp->lee_sacks.print_parameters();}},
   {ConstitutiveModelParameters::NEOHOOKEAN_MODEL, [](CmpType cp) -> void {cp->neo_hookean.print_parameters();}},
   {ConstitutiveModelParameters::STVENANT_KIRCHHOFF_MODEL, [](CmpType cp) -> void {cp->stvenant_kirchhoff.print_parameters();}},
+  {ConstitutiveModelParameters::GR_EQUILIBRATED, [](CmpType cp) -> void {cp->gr_equilibrated.print_parameters();}}
 };
 
 
@@ -714,6 +719,21 @@ void StVenantKirchhoffParameters::set_values(tinyxml2::XMLElement* con_params)
 }
 
 void StVenantKirchhoffParameters::print_parameters()
+{
+}
+
+/// @brief Parameters associated with GR_equilibrated material model
+GREquilibratedParameters::GREquilibratedParameters()
+{
+  value_set = true;
+}
+
+void GREquilibratedParameters::set_values(tinyxml2::XMLElement* con_params)
+{
+  value_set = true;
+}
+
+void GREquilibratedParameters::print_parameters()
 {
 }
 

@@ -471,6 +471,9 @@ void get_pk2cc(const ComMod& com_mod, const CepMod& cep_mod, const dmnType& lDmn
         CC = ten_ddot_2412(CCb, CC, nsd);
       }
     } break;
+    case ConstitutiveModelType::GR_equi: {
+      std::cout<<"wtf"<<std::endl;
+    } break;
 
     default:
       throw std::runtime_error("Undefined material constitutive model.");
