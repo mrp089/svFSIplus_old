@@ -36,6 +36,7 @@
 #include "fft.h"
 #include "mat_fun.h"
 #include "utils.h"
+#include "gr_equilibrated.h"
 
 #include <math.h>
 
@@ -472,7 +473,7 @@ void get_pk2cc(const ComMod& com_mod, const CepMod& cep_mod, const dmnType& lDmn
       }
     } break;
     case ConstitutiveModelType::GR_equi: {
-      std::cout<<"wtf"<<std::endl;
+      gr_equilibrated_ns::stress_tangent_stvk_(F, S, CC);
     } break;
 
     default:

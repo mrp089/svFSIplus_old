@@ -30,25 +30,33 @@
  */
 
 #include "stdafx.h"
-//#include "FEMbeCmm.h"
-//#include "FECore/FEAnalysis.h"					// to get end time
-//#include "FECore/FEModel.h"						// to get current time
-#include <iostream>								// to use cin.get()
+#include <iostream>
 #include <iomanip>
 #include <limits>
 #define _USE_MATH_DEFINES						// to introduce pi constant (1/2)
 #include <math.h>								// to introduce pi constant (2/2)
 #include <cmath>
-//#include "FECore/log.h"							// to print to log file and/or screen
 #include <mat3d.h>
 #include <vec2d.h>
 #include <vec3d.h>
 #include <tens3d.h>
 #include <tens4d.h>
 #include <stdafx.h>
-#include <vtkXMLPolyDataReader.h>
-#include <vtkSmartPointer.h>
+
+#include "Array.h"
+#include "Tensor4.h"
+
+#ifndef GR_EQUILIBRATED
+#define GR_EQUILIBRATED 
+
+namespace gr_equilibrated_ns {
 
 void stress_tangent_(const double* Fe, const double* fl, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out);
 
-void stress_tangent_stvk_(const double* Fe, const double* fl, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out);
+void stress_tangent_stvk_(const Array<double>& Fe, Array<double>&  S_out, Tensor4<double>& CC_out);
+
+void test();
+
+};
+
+#endif

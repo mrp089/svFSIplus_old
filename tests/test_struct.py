@@ -15,7 +15,11 @@ def test_LV_Guccione_passive(n_proc):
     run_with_reference(folder, fields, n_proc)
 
 
-def test_block_compression(n_proc):
+@pytest.mark.parametrize(
+    "material",
+    ["nHK", "GR_equilibrated"],
+)
+def test_block_compression(n_proc, material):
     folder = os.path.join(base_folder, "block_compression")
     fields = [
         "Displacement",
@@ -27,4 +31,7 @@ def test_block_compression(n_proc):
         "Def_grad",
         "VonMises_stress",
     ]
-    run_with_reference(folder, fields, n_proc)
+    t_max = 1
+    name_inp = "svFSI_" + material + ".xml"
+    name_ref = "result_" + material + "_" + str(t_max).zfill(3) + ".vtu"
+    run_with_reference(folder, fields, n_proc, t_max, name_ref, name_inp)

@@ -31,8 +31,9 @@
 
 #include "gr_equilibrated.h"
 
+namespace gr_equilibrated_ns {
 
-void stress_tangent_(const double* Fe, const double* fl, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out)
+void stress_tangent_(const double* Fe, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out)
 {
 	// convert deformation gradient to FEBio format
 	mat3d F(Fe[0], Fe[3], Fe[6], Fe[1], Fe[4], Fe[7], Fe[2], Fe[5], Fe[8]);
@@ -906,13 +907,13 @@ void stress_tangent_(const double* Fe, const double* fl, const double* time, dou
 	}
 }
 
-void stress_tangent_stvk_(const double* Fe, const double* fl, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out)
+void stress_tangent_stvk_(const Array<double>& Fe, Array<double>&  S_out, Tensor4<double>& CC_out)
 {
 	// convert deformation gradient to FEBio format
-	mat3d F(Fe[0], Fe[3], Fe[6], Fe[1], Fe[4], Fe[7], Fe[2], Fe[5], Fe[8]);
+	mat3d F(Fe(0,0), Fe(0,1), Fe(0,2), Fe(1,0), Fe(1,1), Fe(1,2), Fe(2,0), Fe(2,1), Fe(2,2));
 
 	// material parameters
-	const double young = 1000.0;
+	const double young = 240.56596E6;
 	const double nu = 0.4;
 
 	// lame parameters
@@ -939,21 +940,18 @@ void stress_tangent_stvk_(const double* Fe, const double* fl, const double* time
 	typedef double (*ten2)[3];
 	typedef double (*ten4)[3][3][3];
 
-	ten2 S2 = (ten2) S_out;
-	ten4 C4 = (ten4) CC_out;
-
 	for (int i=0; i < 3; i++)
 		for (int j=0; j < 3; j++)
-			S2[j][i] = S(i, j);
+			S_out(i,j) = S(i, j);
 
 	for (int i=0; i < 3; i++)
 		for (int j=0; j < 3; j++)
 			for (int k=0; k < 3; k++)
 				for (int l=0; l < 3; l++)
-					C4[l][k][j][i] = css(i, j, k, l);
+					CC_out(i, j, k, l) = css(i, j, k, l);
 }
 
-
+}
 //void print_mat(const std::string name, const double* mat) {
 //	std::cout<<name;
 //	for (int i=0; i<9; i++)

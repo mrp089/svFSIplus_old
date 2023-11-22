@@ -104,7 +104,7 @@ set(CSRCS
   fsi.h fsi.cpp
   fs.h fs.cpp
   fft.h fft.cpp
-  gr_equilibrated.cpp
+  gr_equilibrated.h gr_equilibrated.cpp
   heatf.h heatf.cpp
   heats.h heats.cpp
   initialize.h initialize.cpp
