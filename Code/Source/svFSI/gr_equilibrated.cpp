@@ -33,10 +33,10 @@
 
 namespace gr_equilibrated_ns {
 
-void stress_tangent_(const double* Fe, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out)
+void stress_tangent_(const Array<double>& Fe, const double time, const Vector<double>& eVWP, Vector<double>& grInt, Array<double>& S_out, Tensor4<double>& CC_out)
 {
 	// convert deformation gradient to FEBio format
-	mat3d F(Fe[0], Fe[3], Fe[6], Fe[1], Fe[4], Fe[7], Fe[2], Fe[5], Fe[8]);
+	mat3d F(Fe(0,0), Fe(0,1), Fe(0,2), Fe(1,0), Fe(1,1), Fe(1,2), Fe(2,0), Fe(2,1), Fe(2,2));
 
 	// right Cauchy-Green tensor and its inverse
 	const mat3ds C = (F.transpose() * F).sym();
@@ -74,10 +74,10 @@ void stress_tangent_(const double* Fe, const double* time, double* eVWP, double*
 	double t;
 	if (coup_wss)
 		// time from partitioned coupling (passed through input file)
-		t = eVWP[7];
+		t = eVWP(7);
 	else
 		// time from monolithic coupling (svFSI provided)
-		t = *time;
+		t = time;
 
 	// time step size
 	const double dt = 1.0;
@@ -104,7 +104,7 @@ void stress_tangent_(const double* Fe, const double* time, double* eVWP, double*
 	const double hwaves = 2.0;
 	const double lo = 15.0 * mult;
 
-	const vec3d  X(eVWP[3], eVWP[4], eVWP[5]);
+	const vec3d  X(eVWP(3), eVWP(4), eVWP(5));
 //	const vec3d  Xcl(0.0, imper/100.0*rIo*sin(hwaves*M_PI*X.z/lo), X.z);		// center line
 	const vec3d  Xcl(curve / 2.0 * (1.0 - cos(2.0 * M_PI * X.z / lo)), 0.0, X.z);		// center line
 	vec3d NX(X.x-Xcl.x,X.y-Xcl.y,X.z-Xcl.z);								// radial vector
@@ -117,13 +117,13 @@ void stress_tangent_(const double* Fe, const double* time, double* eVWP, double*
 	vec3d N[3];
 
 	// WSS
-	const double tau = eVWP[6];
+	const double tau = eVWP(6);
 
 	// WSS of previous time step
-	const double tau_old = eVWP[12];
+	const double tau_old = eVWP(12);
 
 	// dWSS
-	const vec3d dtau(eVWP[9],eVWP[10], eVWP[11]);
+	const vec3d dtau(eVWP(9),eVWP(10), eVWP(11));
 //	std::cout<<eVWP[9]<<" "<<eVWP[10]<<" "<<eVWP[11]<<std::endl;
 
 	// pointwise, consistent with mesh generated with Matlab script <NodesElementsAsy.m>
@@ -375,28 +375,28 @@ void stress_tangent_(const double* Fe, const double* time, double* eVWP, double*
 	// retrieve prestress
 	if (mode == gr or mode == elastic)
 	{
-		Jo   = grInt[0];
-		svo  = grInt[1];
-		phic = grInt[2];
-		tauo = grInt[3];
-		po   = grInt[4];
+		Jo   = grInt(0);
+		svo  = grInt(1);
+		phic = grInt(2);
+		tauo = grInt(3);
+		po   = grInt(4);
 		int k = 5;
 		for (int i=0; i<3; i++)
 			for (int j=i; j<3; j++)
 			{
-				smo(i,j) = grInt[k];
+				smo(i,j) = grInt(k);
 				k++;
 			}
 		for (int i=0; i<3; i++)
 			for (int j=i; j<3; j++)
 			{
-				sco(i,j) = grInt[k];
+				sco(i,j) = grInt(k);
 				k++;
 			}
 		for (int i=0; i<3; i++)
 			for (int j=0; j<3; j++)
 			{
-				Fio(i,j) = grInt[k];
+				Fio(i,j) = grInt(k);
 				k++;
 			}
 	}
@@ -404,27 +404,27 @@ void stress_tangent_(const double* Fe, const double* time, double* eVWP, double*
 	// retrieve frozen g&r
 	if (mode == elastic)
 	{
-		Jh    = grInt[25];
-		svh   = grInt[26];
-		phich = grInt[27];
-		tauh  = grInt[28];
+		Jh    = grInt(25);
+		svh   = grInt(26);
+		phich = grInt(27);
+		tauh  = grInt(28);
 		int k = 29;
 		for (int i=0; i<3; i++)
 			for (int j=i; j<3; j++)
 			{
-				smh(i,j) = grInt[k];
+				smh(i,j) = grInt(k);
 				k++;
 			}
 		for (int i=0; i<3; i++)
 			for (int j=i; j<3; j++)
 			{
-				sch(i,j) = grInt[k];
+				sch(i,j) = grInt(k);
 				k++;
 			}
 		for (int i=0; i<3; i++)
 			for (int j=0; j<3; j++)
 			{
-				Fih(i,j) = grInt[k];
+				Fih(i,j) = grInt(k);
 				k++;
 			}
 	}
@@ -795,22 +795,20 @@ void stress_tangent_(const double* Fe, const double* time, double* eVWP, double*
 	typedef double (*ten_2nd)[3];
 	typedef double (*ten_4th)[3][3][3];
 
-	ten_2nd S2 = (ten_2nd) S_out;
 	for (int i=0; i < 3; i++)
 		for (int j=0; j < 3; j++)
 		{
-			S2[j][i] = S(i, j);
+			S_out(i,j) = S(i, j);
 			if (std::isnan(S(i, j)))
 				std::terminate();
 		}
 
-	ten_4th C4 = (ten_4th) CC_out;
 	for (int i=0; i < 3; i++)
 		for (int j=0; j < 3; j++)
 			for (int k=0; k < 3; k++)
 				for (int l=0; l < 3; l++)
 				{
-					C4[l][k][j][i] = css_ref(i, j, k, l);
+					CC_out(i, j, k, l) = css_ref(i, j, k, l);
 					if (std::isnan(css_ref(i, j, k, l)))
 						std::terminate();
 				}
@@ -825,83 +823,83 @@ void stress_tangent_(const double* Fe, const double* time, double* eVWP, double*
 		sco = 1.0/J*(u*(Sc*u)).sym();
 		Fio = F.inverse();
 
-		grInt[0] = Jo;
-		grInt[1] = svo;
-		grInt[2] = phic;
-		grInt[3] = tau;
-		grInt[4] = po;
+		grInt(0) = Jo;
+		grInt(1) = svo;
+		grInt(2) = phic;
+		grInt(3) = tau;
+		grInt(4) = po;
 		int k = 5;
 		for (int i=0; i<3; i++)
 			for (int j=i; j<3; j++)
 			{
-				grInt[k] = smo(i,j);
+				grInt(k) = smo(i,j);
 				k++;
 			}
 		for (int i=0; i<3; i++)
 			for (int j=i; j<3; j++)
 			{
-				grInt[k] = sco(i,j);
+				grInt(k) = sco(i,j);
 				k++;
 			}
 		for (int i=0; i<3; i++)
 			for (int j=0; j<3; j++)
 			{
-				grInt[k] = Fio(i,j);
+				grInt(k) = Fio(i,j);
 				k++;
 			}
-		// grInt[28] = tau;
+		// grInt(28) = tau;
 		
 		k = 26;
-		grInt[k]      = J;
-		grInt[k + 1]  = 1.0/3.0/J*S.dotdot(C);
-		grInt[k + 2]  = phico;
-		grInt[k + 3]  = 1.0;
-		grInt[k + 4]  = p;
-		grInt[k + 5]  = grInt[k + 3] - 1.0; // delta tau
-		grInt[k + 6]  = grInt[k + 1] / grInt[1] - 1.0; // delta sigma
-		grInt[k + 7]  = KsKi; // kski = delta sigma / deltau tau
-		grInt[k + 8]  = grInt[k + 6] - KsKi * grInt[k + 5]; // ups -> 0
-		grInt[k + 9]  = p0;
-		grInt[k + 10] = p0 / p;
-		grInt[k + 11] = phic;
+		grInt(k)      = J;
+		grInt(k + 1)  = 1.0/3.0/J*S.dotdot(C);
+		grInt(k + 2)  = phico;
+		grInt(k + 3)  = 1.0;
+		grInt(k + 4)  = p;
+		grInt(k + 5)  = grInt(k + 3) - 1.0; // delta tau
+		grInt(k + 6)  = grInt(k + 1) / grInt(1) - 1.0; // delta sigma
+		grInt(k + 7)  = KsKi; // kski = delta sigma / deltau tau
+		grInt(k + 8)  = grInt(k + 6) - KsKi * grInt(k + 5); // ups -> 0
+		grInt(k + 9)  = p0;
+		grInt(k + 10) = p0 / p;
+		grInt(k + 11) = phic;
 	}
 	// store g&r state
 	if (mode == gr)
 	{
 		int k = 26;
-		grInt[k]      = J;
-		grInt[k + 1]  = 1.0/3.0/J*S.dotdot(C);
-		grInt[k + 2]  = phico;
-		grInt[k + 3]  = tau_ratio;
-		grInt[k + 4]  = p;
-		grInt[k + 5]  = grInt[k + 3] - 1.0; // delta tau
-		grInt[k + 6]  = grInt[k + 1] / grInt[1] - 1.0; // delta sigma
-		grInt[k + 7]  = grInt[k + 6] / grInt[k + 5]; // kski = delta sigma / deltau tau
-		grInt[k + 8]  = grInt[k + 6] - KsKi * grInt[k + 5]; // ups -> 0
-		grInt[k + 9]  = p0;
-		grInt[k + 10] = p0 / p;
-		grInt[k + 11] = phic;
+		grInt(k)      = J;
+		grInt(k + 1)  = 1.0/3.0/J*S.dotdot(C);
+		grInt(k + 2)  = phico;
+		grInt(k + 3)  = tau_ratio;
+		grInt(k + 4)  = p;
+		grInt(k + 5)  = grInt(k + 3) - 1.0; // delta tau
+		grInt(k + 6)  = grInt(k + 1) / grInt(1) - 1.0; // delta sigma
+		grInt(k + 7)  = grInt(k + 6) / grInt(k + 5); // kski = delta sigma / deltau tau
+		grInt(k + 8)  = grInt(k + 6) - KsKi * grInt(k + 5); // ups -> 0
+		grInt(k + 9)  = p0;
+		grInt(k + 10) = p0 / p;
+		grInt(k + 11) = phic;
 		// Fih = F.inverse();
-		// grInt[25] = J;
-		// grInt[26] = svo;
-		// grInt[27] = phico;
+		// grInt(25] = J;
+		// grInt(26] = svo;
+		// grInt(27] = phico;
 		// int k = 29;
 		// for (int i=0; i<3; i++)
 		// 	for (int j=i; j<3; j++)
 		// 	{
-		// 		grInt[k] = smo(i,j);
+		// 		grInt(k] = smo(i,j);
 		// 		k++;
 		// 	}
 		// for (int i=0; i<3; i++)
 		// 	for (int j=i; j<3; j++)
 		// 	{
-		// 		grInt[k] = sco(i,j);
+		// 		grInt(k] = sco(i,j);
 		// 		k++;
 		// 	}
 		// for (int i=0; i<3; i++)
 		// 	for (int j=0; j<3; j++)
 		// 	{
-		// 		grInt[k] = Fih(i,j);
+		// 		grInt(k] = Fih(i,j);
 		// 		k++;
 		// 	}
 	}

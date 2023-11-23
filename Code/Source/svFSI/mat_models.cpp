@@ -473,9 +473,7 @@ void get_pk2cc(const ComMod& com_mod, const CepMod& cep_mod, const dmnType& lDmn
       }
     } break;
     case ConstitutiveModelType::GR_equi: {
-      // com_mod.time;
-      // gr_int;
-      gr_equilibrated_ns::stress_tangent_stvk_(F, S, CC);
+      gr_equilibrated_ns::stress_tangent_(F, com_mod.time, gr_props, gr_int, S, CC);
     } break;
 
     default:
