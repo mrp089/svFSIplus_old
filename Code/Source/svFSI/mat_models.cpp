@@ -71,6 +71,7 @@ void actv_strain(const ComMod& com_mod, const CepMod& cep_mod, const double gf,
 void cc_to_voigt(const int nsd, const Tensor4<double>& CC, Array<double>& Dm)
 {
   if (nsd == 3) {
+    // Lower triangle
     Dm(0,0) = CC(0,0,0,0);
     Dm(0,1) = CC(0,0,1,1);
     Dm(0,2) = CC(0,0,2,2);
@@ -98,11 +99,26 @@ void cc_to_voigt(const int nsd, const Tensor4<double>& CC, Array<double>& Dm)
 
     Dm(5,5) = CC(2,0,2,0);
 
-    for (int i = 1; i < 6; i++) {
-      for (int j = 0; j <= i-1; j++) {
-        Dm(i,j) = Dm(j,i);
-      }
-    }
+    // Upper triangle
+    Dm(1,0) = CC(1,1,0,0);
+
+    Dm(2,0) = CC(2,2,0,0);
+    Dm(2,1) = CC(2,2,1,1);
+    
+    Dm(3,0) = CC(0,1,0,0);
+    Dm(3,1) = CC(0,1,1,1);
+    Dm(3,2) = CC(0,1,2,2);
+
+    Dm(4,0) = CC(1,2,0,0);
+    Dm(4,1) = CC(1,2,1,1);
+    Dm(4,2) = CC(1,2,2,2);
+    Dm(4,3) = CC(1,2,0,1);
+
+    Dm(5,0) = CC(2,0,0,0);
+    Dm(5,1) = CC(2,0,1,1);
+    Dm(5,2) = CC(2,0,2,2);
+    Dm(5,3) = CC(2,0,0,1);
+    Dm(5,4) = CC(2,0,1,2);
 
   } else if (nsd == 2) { 
      Dm(0,0) = CC(0,0,0,0);
@@ -114,9 +130,9 @@ void cc_to_voigt(const int nsd, const Tensor4<double>& CC, Array<double>& Dm)
 
      Dm(2,2) = CC(0,1,0,1);
 
-     Dm(1,0) = Dm(0,1);
-     Dm(2,0) = Dm(0,2);
-     Dm(2,1) = Dm(1,2);
+     Dm(1,0) = CC(1,1,0,0);
+     Dm(2,0) = CC(0,1,0,0);
+     Dm(2,1) = CC(0,1,1,1);
   } 
 }
 
