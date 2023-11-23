@@ -227,8 +227,9 @@ const std::map<std::string,PreconditionerMapType> preconditioner_name_to_type =
   {"trilinos-ic", std::make_pair(PreconditionerType::PREC_TRILINOS_IC,true)},
   {"trilinos-ict", std::make_pair(PreconditionerType::PREC_TRILINOS_ICT,true)},
 
-  {"trilinos-ml", std::make_pair(PreconditionerType::PREC_TRILINOS_ML,true)}
+  {"trilinos-ml", std::make_pair(PreconditionerType::PREC_TRILINOS_ML,true)},
 
+  {"petsc", std::make_pair(PreconditionerType::PREC_PETSC,true)}
 };
 
 /// @brief Map solver type string to SolverType enum. 

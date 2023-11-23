@@ -1920,6 +1920,14 @@ void read_ls(Simulation* simulation, EquationParameters* eq_params, consts::Solv
     //lEq.useTLS = use_trilinos;
   }
 
+  if (lEq.ls.PREC_Type == PreconditionerType::PREC_PETSC) {
+    if (!linear_solver.PETSc_file_path.defined()){
+      throw std::runtime_error("No PETSc config file");
+    }
+    lEq.ls.config = linear_solver.PETSc_file_path.value();
+  }
+
+
   if (lEq.useTLS) {
     lEq.assmTLS = linear_solver.use_trilinos_for_assembly.value();
     if (lEq.assmTLS && simulation->com_mod.ibFlag) {

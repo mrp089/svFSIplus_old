@@ -871,6 +871,8 @@ class LinearSolverParameters : public ParameterLists
     Parameter<double> tolerance;
 
     Parameter<bool> use_trilinos_for_assembly;
+
+    Parameter<std::string> PETSc_file_path;
 };
 
 /// @brief The StimulusParameters class stores parameters for 
