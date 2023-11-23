@@ -530,7 +530,7 @@ void load_gr_properties_vtu(const std::string& file_name, const std::string& dat
   if (FILE *file = fopen(file_name.c_str(), "r")) {
       fclose(file);
   } else {
-    throw std::runtime_error("The fiber direction VTK file '" + file_name + "' can't be read.");
+    throw std::runtime_error("The growth and remodeling properties VTK file '" + file_name + "' can't be read.");
   }
 
   auto reader = vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
