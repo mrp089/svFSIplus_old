@@ -1730,7 +1730,9 @@ void tpost(Simulation* simulation, const mshType& lM, const int m, Array<double>
   Vector<double> resl(m); 
   Array<double> Nx(nsd,fs.eNoN); 
   Vector<double> N(fs.eNoN);
-  Vector<double> grInt_l(com_mod.nGrInt);
+  Vector<double> gr_int_l(com_mod.nGrInt);
+  Array<double> gr_props_l(lM.n_gr_props,fs.eNoN);
+  Vector<double> gr_props_g(lM.n_gr_props);
 
   double ya = 0.0;
 
@@ -1788,6 +1790,11 @@ void tpost(Simulation* simulation, const mshType& lM, const int m, Array<double>
         dl(i,a) = lD(i,Ac);
         yl(i,a) = lY(i,Ac);
       }
+      if (lM.gr_props.size() != 0) {
+        for (int igr = 0; igr < lM.n_gr_props; igr++) {
+          gr_props_l(igr,a) = lM.gr_props(igr,Ac);
+        }
+      }
     }
 
     Je = 0.0;
@@ -1806,6 +1813,7 @@ void tpost(Simulation* simulation, const mshType& lM, const int m, Array<double>
       auto Im = mat_fun::mat_id(nsd); 
       auto F = Im;
 
+      gr_props_g = 0;
       for (int a = 0; a < fs.eNoN; a++) {
         if (nsd == 3) {
           F(0,0) = F(0,0) + Nx(0,a)*dl(i,a);
@@ -1822,6 +1830,10 @@ void tpost(Simulation* simulation, const mshType& lM, const int m, Array<double>
           F(0,1) = F(0,1) + Nx(1,a)*dl(i,a);
           F(1,0) = F(1,0) + Nx(0,a)*dl(j,a);
           F(1,1) = F(1,1) + Nx(1,a)*dl(j,a);
+        }
+
+        for (int igr = 0; igr < lM.n_gr_props; igr++) {
+          gr_props_g(igr) += gr_props_l(igr,a) * N(a);
         }
       }
 
@@ -1850,7 +1862,7 @@ void tpost(Simulation* simulation, const mshType& lM, const int m, Array<double>
       if (com_mod.grEq) {
         // todo mrp089: add a function like rslice for vectors to Array3
         for (int i = 0; i < com_mod.nGrInt; i++) {
-            grInt_l(i) = com_mod.grInt(e,g,i);
+            gr_int_l(i) = com_mod.grInt(e,g,i);
         }
       }
 
@@ -1958,7 +1970,7 @@ void tpost(Simulation* simulation, const mshType& lM, const int m, Array<double>
 
           } else if (cPhys == EquationType::phys_struct) {
             Array<double> Dm(nsymd,nsymd);
-            mat_models::get_pk2cc(com_mod, cep_mod, eq.dmn[cDmn], F, nFn, fN, ya, grInt_l, S, Dm);
+            mat_models::get_pk2cc(com_mod, cep_mod, eq.dmn[cDmn], F, nFn, fN, ya, gr_int_l, gr_props_g, S, Dm);
 
             auto P1 = mat_mul(F, S);
             sigma = mat_mul(P1, transpose(F));

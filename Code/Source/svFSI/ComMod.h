@@ -857,6 +857,9 @@ class mshType
     /// @brief Number of fiber directions
     int nFn = 0;
 
+    /// @brief Number of growth and remodeling properties in gr_props
+    int n_gr_props = 0;
+
     /// @brief Mesh scale factor
     double scF = 0.0;
 
@@ -930,8 +933,8 @@ class mshType
     /// electrophysiology and solid mechanics
     Array<double> fN;
 
-    /// @brief Wall properties stored at the node level
-    Array<double> wall_props;
+    /// @brief Growth and remodeling properties stored at the node level
+    Array<double> gr_props;
 
     /// @brief Parent shape functions gradient
     /// double Nx(:,:,:)

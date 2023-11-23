@@ -94,8 +94,8 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const Ar
   Vector<int> ptr(eNoN); 
   Array3<double> lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN);
   Array<double> xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN), 
-      fN(nsd,nFn), pS0l(nsymd,eNoN), lR(dof,eNoN);
-  Vector<double> pSl(nsymd), ya_l(eNoN), grInt_l(com_mod.nGrInt);
+      fN(nsd,nFn), pS0l(nsymd,eNoN), lR(dof,eNoN), gr_props_l(lM.n_gr_props,eNoN);
+  Vector<double> pSl(nsymd), ya_l(eNoN), gr_int_l(com_mod.nGrInt);
 
   std::array<fsType,2> fs_1;
   fs::get_thood_fs(com_mod, fs_1, lM, vmsStab, 1);
@@ -125,7 +125,8 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const Ar
     fN  = 0.0;
     pS0l = 0.0;
     ya_l = 0.0;
-    grInt_l = 0.0;
+    gr_int_l = 0.0;
+    gr_props_l = 0.0;
 
     for (int a = 0; a < eNoN; a++) {
       int Ac = lM.IEN(a,e);
@@ -155,6 +156,12 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const Ar
 
       if (cem.cpld) {
         ya_l(a) = cem.Ya(Ac);
+      }
+
+      if (lM.gr_props.size() != 0) {
+        for (int igr = 0; igr < lM.n_gr_props; igr++) {
+          gr_props_l(igr,Ac);
+        }
       }
     }
 
@@ -228,7 +235,7 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const Ar
 
           case Equation_struct: {
             auto N0 = fs_1[0].N.col(g);
-            struct_ns::struct_3d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0, Nwx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, grInt_l, lR, lK);
+            struct_ns::struct_3d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0, Nwx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, gr_int_l, gr_props_l, lR, lK);
           } break;
           case Equation_lElas:
             throw std::runtime_error("[construct_fsi] LELAS3D not implemented");
@@ -257,7 +264,7 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const Ar
 
           case Equation_struct: {
             auto N0 = fs_1[0].N.col(g);
-            struct_ns::struct_2d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0, Nwx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, grInt_l, lR, lK);
+            struct_ns::struct_2d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0, Nwx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, gr_int_l, gr_props_l, lR, lK);
           } break;
 
           case Equation_ustruct:

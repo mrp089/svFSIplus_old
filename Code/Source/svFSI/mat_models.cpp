@@ -145,7 +145,7 @@ void get_fib_stress(const ComMod& com_mod, const CepMod& cep_mod, const fibStrsT
 /// Reproduces the Fortran 'GETPK2CC' subroutine.
 //
 void get_pk2cc(const ComMod& com_mod, const CepMod& cep_mod, const dmnType& lDmn, const Array<double>& F, const int nfd,
-    const Array<double>& fl, const double ya, Vector<double>& grInt, Array<double>& S, Array<double>& Dm)
+    const Array<double>& fl, const double ya, Vector<double>& gr_int, const Vector<double>& gr_props, Array<double>& S, Array<double>& Dm)
 {
   using namespace consts;
   using namespace mat_fun;
@@ -474,7 +474,7 @@ void get_pk2cc(const ComMod& com_mod, const CepMod& cep_mod, const dmnType& lDmn
     } break;
     case ConstitutiveModelType::GR_equi: {
       // com_mod.time;
-      // grInt;
+      // gr_int;
       gr_equilibrated_ns::stress_tangent_stvk_(F, S, CC);
     } break;
 

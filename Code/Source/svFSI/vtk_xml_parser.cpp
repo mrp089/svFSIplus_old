@@ -558,14 +558,15 @@ void load_gr_properties_vtu(const std::string& file_name, const std::string& dat
 
   // Initialize array
   int num_comps = wall_data->GetNumberOfComponents();
-  mesh.wall_props = Array<double>(num_comps, num_nodes);
-  mesh.wall_props = 0.0;
+  mesh.n_gr_props = num_comps;
+  mesh.gr_props = Array<double>(num_comps, num_nodes);
+  mesh.gr_props = 0.0;
 
   // Fill array with components
   for (int n = 0; n < mesh.gnNo; n++) {
-    auto wall_prop = wall_data->GetTuple(n);
+    auto gr_prop = wall_data->GetTuple(n);
     for (int i = 0; i < num_comps; i++) {
-      mesh.wall_props(i, n) = wall_prop[i];
+      mesh.gr_props(i, n) = gr_prop[i];
     }
   }
 }
