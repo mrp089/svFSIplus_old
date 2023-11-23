@@ -94,7 +94,7 @@ PetscLogStage  stages[6];  /* performance tuning. */
     
 #define PETSc_PC_FSILS  701
 #define PETSc_PC_RCS    709
-#define PETSc_PC        713
+#define PETSc_PC        710
 
 /* Physics solved */
 #define EQ_fluid   201

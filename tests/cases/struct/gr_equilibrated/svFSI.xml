@@ -77,10 +77,9 @@
      <VonMises_stress> true </VonMises_stress>
    </Output>
 
-   <LS type="BICG" >
-      <Preconditioner> FSILS </Preconditioner> 
-      <Tolerance> 1e-11 </Tolerance>
-      <Max_iterations> 600 </Max_iterations> 
+   <LS type="GMRES" >
+      <Preconditioner> PETSc </Preconditioner>
+      <PETSc_file_path>direct.inp</PETSc_file_path>
    </LS>
 
    <Add_BC name="start" > 
