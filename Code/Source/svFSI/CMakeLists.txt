@@ -157,6 +157,14 @@ if(WITH_TRILINOS)
   link_directories(${Trilinos_TPL_LIBRARY_DIRS})
 endif()
 
+# todo mrp: remove and replace with internal functions
+set(SV_FEBIO_DIR "${SV_SOURCE_DIR}/ThirdParty/febio/")
+set(CSRCS ${CSRCS} ${SV_FEBIO_DIR}/eig3.cpp)
+set(CSRCS ${CSRCS} ${SV_FEBIO_DIR}/mat3d.cpp)
+set(CSRCS ${CSRCS} ${SV_FEBIO_DIR}/stdafx.cpp)
+set(CSRCS ${CSRCS} ${SV_FEBIO_DIR}/tens3d.cpp)
+set(CSRCS ${CSRCS} ${SV_FEBIO_DIR}/tens4d.cpp)
+
 simvascular_add_executable(${SV_SVFSI_EXE}
   SRCS ${CSRCS}
   DEV_SCRIPT_NAME "mysvfsi"
@@ -210,11 +218,4 @@ if(ENABLE_COVERAGE)
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 
-# todo mrp: remove and replace with internal functions
-set(SV_FEBIO_DIR "${SV_SOURCE_DIR}/ThirdParty/febio/")
-set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/eig3.cpp)
-set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/mat3d.cpp)
-set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/stdafx.cpp)
-set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/tens3d.cpp)
-set(CXXSRCS ${CXXSRCS} ${SV_FEBIO_DIR}/tens4d.cpp)
 
