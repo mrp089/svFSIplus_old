@@ -51,7 +51,8 @@
 
 namespace gr_equilibrated_ns {
 
-void stress_tangent_(const double* Fe, const double* fl, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out);
+// void stress_tangent_(const double* Fe, const double* fl, const double* time, double* eVWP, double* grInt, double* S_out, double* CC_out);
+void stress_tangent_(const Array<double>& Fe, const double* time, Array<double>& eVWP, Array<double>& grInt, Array<double>& S_out, Tensor4<double>& CC_out);
 
 void stress_tangent_stvk_(const Array<double>& Fe, Array<double>&  S_out, Tensor4<double>& CC_out);
 

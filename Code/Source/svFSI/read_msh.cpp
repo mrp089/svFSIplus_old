@@ -1604,7 +1604,7 @@ void read_msh(Simulation* simulation)
     auto mesh_param = simulation->parameters.mesh_parameters[iM];
     if (mesh_param->gr_properties_file_path.defined()) {
       auto wall_path = mesh_param->gr_properties_file_path.value();
-      vtk_xml_parser::load_gr_properties_vtu(wall_path, "wall_properties", com_mod.msh[iM]);
+      vtk_xml_parser::load_gr_properties_vtu(wall_path, "gr_properties", com_mod.msh[iM]);
     }
   }
 

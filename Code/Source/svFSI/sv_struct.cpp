@@ -242,7 +242,7 @@ void construct_dsolid(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const
   // STRUCT: dof = nsd
 
   Vector<int> ptr(eNoN);
-  Vector<double> pSl(nsymd), ya_l(eNoN), N(eNoN);
+  Vector<double> pSl(nsymd), ya_l(eNoN), N(eNoN), grInt_l(com_mod.nGrInt);
   Array<double> xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), 
                 bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN), Nx(nsd,eNoN), lR(dof,eNoN);
   Array3<double> lK(dof*dof,eNoN,eNoN);
@@ -266,6 +266,7 @@ void construct_dsolid(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const
     fN  = 0.0;
     pS0l = 0.0;
     ya_l = 0.0;
+    grInt_l = 0.0;
 
     for (int a = 0; a < eNoN; a++) {
       int Ac = lM.IEN(a,e);
@@ -319,11 +320,27 @@ void construct_dsolid(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const
       N = lM.N.col(g);
       pSl = 0.0;
 
+      // Get internal growth and remodeling variables
+      if (com_mod.grEq) {
+        // todo mrp089: add a function like rslice for vectors to Array3
+        for (int i = 0; i < com_mod.nGrInt; i++) {
+            grInt_l(i) = com_mod.grInt(e,g,i);
+        }
+      }
+
       if (nsd == 3) {
-        struct_3d(com_mod, cep_mod, eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK);
+        struct_3d(com_mod, cep_mod, eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, grInt_l, lR, lK);
 
       } else if (nsd == 2) {
-        struct_2d(com_mod, cep_mod, eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK);
+        struct_2d(com_mod, cep_mod, eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, grInt_l, lR, lK);
+      }
+
+      // Set internal growth and remodeling variables
+      if (com_mod.grEq) {
+        // todo mrp089: add a function like rslice for vectors to Array3
+        for (int i = 0; i < com_mod.nGrInt; i++) {
+            com_mod.grInt(e,g,i) = grInt_l(i);
+        }
       }
 
       // Prestress
@@ -358,7 +375,7 @@ void construct_dsolid(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const
 void struct_2d(ComMod& com_mod, CepMod& cep_mod, const int eNoN, const int nFn, const double w, 
     const Vector<double>& N, const Array<double>& Nx, const Array<double>& al, const Array<double>& yl, 
     const Array<double>& dl, const Array<double>& bfl, const Array<double>& fN, const Array<double>& pS0l, 
-    Vector<double>& pSl, const Vector<double>& ya_l, Array<double>& lR, Array3<double>& lK) 
+    Vector<double>& pSl, const Vector<double>& ya_l, Vector<double>& grInt, Array<double>& lR, Array3<double>& lK) 
 {
   using namespace consts;
   using namespace mat_fun;
@@ -452,7 +469,7 @@ void struct_2d(ComMod& com_mod, CepMod& cep_mod, const int eNoN, const int nFn, 
   Svis = 2.0 * mu * Jac * mat_mul(Fi, Svis);
 
   Array<double> S(2,2), Dm(3,3);
-  mat_models::get_pk2cc(com_mod, cep_mod, dmn, F, nFn, fN, ya_g, S, Dm);
+  mat_models::get_pk2cc(com_mod, cep_mod, dmn, F, nFn, fN, ya_g, grInt, S, Dm);
 
   // Elastic + Viscous stresses
   S = S + Svis;
@@ -587,7 +604,7 @@ void struct_2d(ComMod& com_mod, CepMod& cep_mod, const int eNoN, const int nFn, 
 void struct_3d(ComMod& com_mod, CepMod& cep_mod, const int eNoN, const int nFn, const double w, 
     const Vector<double>& N, const Array<double>& Nx, const Array<double>& al, const Array<double>& yl, 
     const Array<double>& dl, const Array<double>& bfl, const Array<double>& fN, const Array<double>& pS0l, 
-    Vector<double>& pSl, const Vector<double>& ya_l, Array<double>& lR, Array3<double>& lK) 
+    Vector<double>& pSl, const Vector<double>& ya_l, Vector<double>& grInt_l, Array<double>& lR, Array3<double>& lK) 
 {
   using namespace consts;
   using namespace mat_fun;
@@ -720,7 +737,7 @@ void struct_3d(ComMod& com_mod, CepMod& cep_mod, const int eNoN, const int nFn, 
   // Voigt notationa (Dm)
   //
   Array<double> S(3,3), Dm(6,6); 
-  mat_models::get_pk2cc(com_mod, cep_mod, dmn, F, nFn, fN, ya_g, S, Dm);
+  mat_models::get_pk2cc(com_mod, cep_mod, dmn, F, nFn, fN, ya_g, grInt_l, S, Dm);
 
   // Elastic + Viscous stresses
   S = S + Svis;

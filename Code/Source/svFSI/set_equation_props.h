@@ -602,6 +602,7 @@ SetEquationPropertiesMapType set_equation_props = {
 
   if (dmn.stM.isoType == ConstitutiveModelType::GR_equi) {
     com_mod.grEq = true;
+    com_mod.nGrInt = 50;
   }
 
 } },

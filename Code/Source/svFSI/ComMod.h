@@ -1447,6 +1447,9 @@ class ComMod {
     /// @brief Number of stress values to be stored
     int nsymd = 0;
 
+    /// @brief Number of internal growth and remodeling variables
+    int nGrInt = 0;
+
 
     //----- double members -----//
 

@@ -605,7 +605,8 @@ void initialize(Simulation* simulation, Vector<double>& timeP)
   // Growth and remodeling
   if(com_mod.grEq == true) {
     // Initialize array for G&R internal variables stored at the Gauss point
-    com_mod.grInt.resize(com_mod.tDof,com_mod.tnNo,com_mod.msh[0].nG);
+    // Dimension: (#elements, #gauss points, #internal variables)
+    com_mod.grInt.resize(com_mod.msh[0].gnEl,com_mod.msh[0].nG,com_mod.nGrInt);
   }
 
   // Setup data for remeshing.
