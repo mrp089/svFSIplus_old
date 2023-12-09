@@ -45,6 +45,7 @@
 #include <vtkXMLPolyDataWriter.h>
 #include <vtkXMLUnstructuredGridReader.h>
 #include <vtkXMLUnstructuredGridWriter.h>
+#include <vtkCellDataToPointData.h>
 #include <string>
 #include <map>
 
@@ -240,6 +241,7 @@ class VtkVtuData::VtkVtuDataImpl {
 
     void set_points(const Array<double>& points);
     void write(const std::string& file_name);
+    void cell_to_point_data(const std::string& data_name);
 
     template<typename T1, typename T2>
     void set_element_data(const std::string& data_name, const T1& data, T2& data_array)
@@ -711,6 +713,11 @@ bool VtkVtpData::has_point_data(const std::string& data_name)
   return false;
 }
 
+void VtkVtpData::cell_to_point_data(const std::string& data_name)
+{
+  throw std::runtime_error("[VtkVtpData] cell_to_point_data not implemented.");
+}
+
 int VtkVtpData::num_elems() 
 { 
   return impl->num_elems; 
@@ -879,6 +886,16 @@ bool VtkVtuData::has_point_data(const std::string& data_name)
   }
 
   return false;
+}
+
+void VtkVtuData::cell_to_point_data(const std::string& data_name)
+{
+  auto filter = vtkSmartPointer<vtkCellDataToPointData>::New();
+  filter->SetInputData(impl->vtk_ugrid);
+  filter->Update();
+  auto array = vtkDoubleArray::SafeDownCast(filter->GetOutput()->GetPointData()->GetArray(data_name.c_str()));
+  
+  impl->vtk_ugrid->GetPointData()->AddArray(array);
 }
 
 /// @brief Get an array of point data from an unstructured grid.

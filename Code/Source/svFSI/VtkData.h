@@ -62,6 +62,7 @@ class VtkData {
     virtual void set_connectivity(const int nsd, const Array<int>& conn, const int pid = 0) = 0;
 
     virtual bool has_point_data(const std::string& data_name) = 0;
+    virtual void cell_to_point_data(const std::string& data_name) = 0;
 
     virtual void copy_point_data(const std::string& data_name, Array<double>& mesh_data) = 0;
     virtual void copy_point_data(const std::string& data_name, Vector<double>& mesh_data) = 0;
@@ -91,6 +92,7 @@ class VtkVtpData : public VtkData {
     void copy_point_data(const std::string& data_name, Vector<double>& mesh_data);
     Array<double> get_point_data(const std::string& data_name);
     bool has_point_data(const std::string& data_name);
+    virtual void cell_to_point_data(const std::string& data_name);
     virtual void set_connectivity(const int nsd, const Array<int>& conn, const int pid = 0);
 
     virtual void set_element_data(const std::string& data_name, const Array<double>& data);
@@ -128,6 +130,7 @@ class VtkVtuData : public VtkData {
     Array<double> get_point_data(const std::string& data_name);
     virtual Array<double> get_points();
     bool has_point_data(const std::string& data_name);
+    virtual void cell_to_point_data(const std::string& data_name);
     virtual void set_connectivity(const int nsd, const Array<int>& conn, const int pid = 0);
 
     virtual void set_element_data(const std::string& data_name, const Array<double>& data);
