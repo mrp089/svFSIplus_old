@@ -32,6 +32,7 @@ def test_block_compression(n_proc, material):
     run_with_reference(folder, fields, n_proc)
 
 
+@pytest.mark.parametrize("n_proc", [1])
 def test_gr_equilibrated(n_proc):
     folder = os.path.join(base_folder, "gr_equilibrated")
     t_max = 11
