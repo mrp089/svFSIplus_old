@@ -56,6 +56,8 @@ class VtkData {
     virtual void set_point_data(const std::string& data_name, const Array<int>& data) = 0;
     virtual void set_point_data(const std::string& data_name, const Vector<int>& data) = 0;
 
+    virtual void set_cell_data(const std::string& data_name, const Array<double>& data) = 0;
+
     virtual void set_points(const Array<double>& points) = 0;
     virtual void set_connectivity(const int nsd, const Array<int>& conn, const int pid = 0) = 0;
 
@@ -98,6 +100,8 @@ class VtkVtpData : public VtkData {
     virtual void set_point_data(const std::string& data_name, const Array<int>& data);
     virtual void set_point_data(const std::string& data_name, const Vector<int>& data);
 
+    virtual void set_cell_data(const std::string& data_name, const Array<double>& data);
+
     virtual void set_points(const Array<double>& points);
     virtual void write();
 
@@ -132,6 +136,8 @@ class VtkVtuData : public VtkData {
     virtual void set_point_data(const std::string& data_name, const Array<double>& data);
     virtual void set_point_data(const std::string& data_name, const Array<int>& data);
     virtual void set_point_data(const std::string& data_name, const Vector<int>& data);
+
+    virtual void set_cell_data(const std::string& data_name, const Array<double>& data);
 
     virtual void set_points(const Array<double>& points);
     virtual void write();

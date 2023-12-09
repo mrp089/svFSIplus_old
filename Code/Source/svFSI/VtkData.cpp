@@ -62,6 +62,7 @@ class VtkVtpData::VtkVtpDataImpl {
     void read_file(const std::string& file_name);
     void set_connectivity(const int nsd, const Array<int>& conn, const int pid);
     void set_point_data(const std::string& data_name, const Vector<int>& data);
+    void set_cell_data(const std::string& data_name, const Array<double>& data);
     void set_points(const Array<double>& points);
     void write(const std::string& file_name);
 
@@ -171,6 +172,11 @@ void VtkVtpData::VtkVtpDataImpl::set_point_data(const std::string& data_name, co
   vtk_polydata->GetPointData()->AddArray(data_array);
 }
 
+void VtkVtpData::VtkVtpDataImpl::set_cell_data(const std::string& data_name, const Array<double>& data)
+{
+  throw std::runtime_error("[VtkVtpData] set_cell_data for Array<double> not implemented.");
+}
+
 /// @brief Set the 3D point (coordinate) data for the polydata.
 //
 void VtkVtpData::VtkVtpDataImpl::set_points(const Array<double>& points)
@@ -218,6 +224,9 @@ class VtkVtuData::VtkVtuDataImpl {
   public:
     void create_grid();
     void read_file(const std::string& file_name);
+    vtkSmartPointer<vtkUnstructuredGrid> get_ugrid(){
+      return vtk_ugrid;
+    };
     void set_connectivity(const int nsd, const Array<int>& conn, const int pid);
 
     void set_element_data(const std::string& data_name, const Array<double>& data);
@@ -226,6 +235,8 @@ class VtkVtuData::VtkVtuDataImpl {
     void set_point_data(const std::string& data_name, const Array<double>& data);
     void set_point_data(const std::string& data_name, const Array<int>& data);
     void set_point_data(const std::string& data_name, const Vector<int>& data);
+
+    void set_cell_data(const std::string& data_name, const Array<double>& data);
 
     void set_points(const Array<double>& points);
     void write(const std::string& file_name);
@@ -467,6 +478,26 @@ void VtkVtuData::VtkVtuDataImpl::set_points(const Array<double>& points)
   }
 
   vtk_ugrid->SetPoints(node_coords);
+}
+
+void VtkVtuData::VtkVtuDataImpl::set_cell_data(const std::string& data_name, const Array<double>& data)
+{
+  int num_vals = data.nrows();
+  int num_comp = data.ncols();
+  auto data_array = vtkSmartPointer<vtkDoubleArray>::New();
+  data_array->SetNumberOfComponents(num_comp);
+  data_array->Allocate(num_vals);
+  data_array->SetName(data_name.c_str());
+
+  for (int i = 0; i < num_vals; i++) {
+    std::vector<double> tmp(num_comp);
+    for (int j = 0; j < num_comp; j++) {
+      tmp[j] = data(i, j);
+    }
+    data_array->InsertNextTuple(&tmp[0]);
+  }
+
+  vtk_ugrid->GetCellData()->AddArray(data_array);
 }
 
 void VtkVtuData::VtkVtuDataImpl::write(const std::string& file_name)
@@ -730,6 +761,12 @@ void VtkVtpData::set_point_data(const std::string& data_name, const Vector<int>&
   impl->set_point_data(data_name, data);
 }
 
+void VtkVtpData::set_cell_data(const std::string& data_name, const Array<double>& data)
+{
+  impl->set_cell_data(data_name, data);
+}
+
+
 void VtkVtpData::set_points(const Array<double>& points)
 {
   impl->set_points(points);
@@ -942,6 +979,11 @@ void VtkVtuData::set_point_data(const std::string& data_name, const Array<int>& 
 void VtkVtuData::set_point_data(const std::string& data_name, const Vector<int>& data)
 {
   impl->set_point_data(data_name, data);
+}
+
+void VtkVtuData::set_cell_data(const std::string& data_name, const Array<double>& data)
+{
+  impl->set_cell_data(data_name, data);
 }
 
 void VtkVtuData::set_points(const Array<double>& points)
