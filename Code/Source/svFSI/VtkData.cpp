@@ -46,6 +46,7 @@
 #include <vtkXMLUnstructuredGridReader.h>
 #include <vtkXMLUnstructuredGridWriter.h>
 #include <vtkCellDataToPointData.h>
+#include <vtkAttributeSmoothingFilter.h>
 #include <string>
 #include <map>
 
@@ -242,6 +243,7 @@ class VtkVtuData::VtkVtuDataImpl {
     void set_points(const Array<double>& points);
     void write(const std::string& file_name);
     void cell_to_point_data(const std::string& data_name);
+    void smooth_point_data(const std::string& data_name);
 
     template<typename T1, typename T2>
     void set_element_data(const std::string& data_name, const T1& data, T2& data_array)
@@ -718,6 +720,11 @@ void VtkVtpData::cell_to_point_data(const std::string& data_name)
   throw std::runtime_error("[VtkVtpData] cell_to_point_data not implemented.");
 }
 
+void VtkVtpData::smooth_point_data(const std::string& data_name)
+{
+  throw std::runtime_error("[VtkVtpData] smooth_point_data not implemented.");
+}
+
 int VtkVtpData::num_elems() 
 { 
   return impl->num_elems; 
@@ -893,8 +900,22 @@ void VtkVtuData::cell_to_point_data(const std::string& data_name)
   auto filter = vtkSmartPointer<vtkCellDataToPointData>::New();
   filter->SetInputData(impl->vtk_ugrid);
   filter->Update();
+
   auto array = vtkDoubleArray::SafeDownCast(filter->GetOutput()->GetPointData()->GetArray(data_name.c_str()));
-  
+  impl->vtk_ugrid->GetPointData()->AddArray(array);
+}
+
+void VtkVtuData::smooth_point_data(const std::string& data_name)
+{
+  auto filter = vtkSmartPointer<vtkAttributeSmoothingFilter>::New();
+  filter->SetInputData(impl->vtk_ugrid);
+  filter->SetSmoothingStrategyToAllPoints();
+  filter->SetNumberOfIterations(100);
+  filter->SetRelaxationFactor(0.1);
+  filter->SetWeightsTypeToDistance();
+  filter->Update();
+
+  auto array = vtkDoubleArray::SafeDownCast(filter->GetOutput()->GetPointData()->GetArray(data_name.c_str()));
   impl->vtk_ugrid->GetPointData()->AddArray(array);
 }
 
