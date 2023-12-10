@@ -46,6 +46,8 @@
 #include <vtkUnstructuredGrid.h>
 #include <vtkSmartPointer.h>
 #include <vtkXMLUnstructuredGridReader.h>
+#include <vtkDoubleArray.h>
+#include <vtkCellDataToPointData.h>
 
 namespace vtk_xml {
 
@@ -1426,6 +1428,167 @@ void write_vtus(Simulation* simulation, const Array<double>& lA, const Array<dou
        }
      }
      vtk_writer->set_element_data("EGHOST", tmpI);
+  }
+
+  vtk_writer->write();
+  delete vtk_writer;
+}
+
+void smooth_output(Simulation* simulation)
+{
+  using namespace consts;
+
+  auto& com_mod = simulation->com_mod;
+  auto& cm = com_mod.cm;
+  auto& cm_mod = simulation->cm_mod;
+  auto& cep_mod = simulation->cep_mod;
+
+  const int nsd = com_mod.nsd;
+  const int nEq = com_mod.nEq;
+  const auto& eqs = com_mod.eq;
+  const auto& Dinit = com_mod.Dinit;
+
+  const int nMsh = com_mod.nMsh;
+  const auto& meshes = com_mod.msh;
+
+  int nOut = 1;
+  int nOute  = 0;
+  int outDof = nsd;
+  int nFn = 0;
+
+  std::vector<std::string> outNames(nOut); 
+  std::vector<int> outS(nOut+1); 
+  std::vector<std::string>outNamesE(nOute);
+
+  // Prepare all solultions in to dataType d
+  std::vector<dataType> d(nMsh);
+
+  for (int iM = 0; iM < nMsh; iM++) {
+    auto& msh = meshes[iM];
+    d[iM].x.resize(outDof, msh.nNo);
+    d[iM].xe.resize(nOute,msh.nEl);
+    Array<double> tmpV(consts::maxNSD,msh.nNo);
+
+    int cOut = 0;
+    outS[cOut] = 0;
+    outS[cOut+1] = nsd;
+    outNames[cOut] = "";
+
+    for (int a = 0; a < msh.nNo; a++) {
+      int Ac = msh.gN(a);
+      for (int i = 0; i < nsd; i++) {
+        d[iM].x(i,a) = com_mod.x(i,Ac) / msh.scF;
+      }
+    }
+
+    nOute = 0;
+    std::fill(outNamesE.begin(), outNamesE.end(), "");
+
+  } // iM for loop 
+
+  // Integrate data from all processors
+  int nNo = 0;
+  int nEl = 0;
+
+  for (int iM = 0; iM < nMsh; iM++) {
+    if (meshes[iM].eType == ElementType::NRB) {
+      // CALL INTNRBDATA(msh(iM), d(iM), outDof)
+    } else { 
+      int_msh_data(com_mod, cm_mod, com_mod.msh[iM], d[iM], outDof, nOute);
+    }
+
+    nNo = nNo + d[iM].nNo;
+    nEl = nEl + d[iM].nEl;
+  }
+
+  if (cm.slv(cm_mod)) {
+    com_mod.savedOnce = true;
+    return; 
+  }
+
+  Array<double> tmpV(consts::maxNSD, nNo);
+
+  // Writing to vtu file (master only)
+  std::string fName = "smooth.vtu";
+  auto vtk_writer = VtkData::create_writer(fName);
+
+  // Writing the position data
+  int iOut = 0;
+  int s = outS[iOut];
+  int e = outS[iOut+1] - 1;
+  int nSh  = 0;
+  tmpV = 0.0;
+
+  for (int iM = 0; iM < nMsh; iM++) {
+    for (int a = 0; a < d[iM].nNo; a++) {
+      for (int i = 0; i < nsd; i++) {
+        tmpV(i,a+nSh) = d[iM].gx(i+s,a);
+      }
+    }
+    nSh = nSh + d[iM].nNo;
+  }
+  vtk_writer->set_points(tmpV);
+
+  // Writing the connectivity data
+  nSh = 0;     // For 0-based IDs.
+  int num_elems = 0;
+
+  for (int iM = 0; iM < nMsh; iM++) {
+    int eNoN = d[iM].eNoN;
+    int nEl = d[iM].nEl;
+    Array<int> tmpI(eNoN, nEl);
+
+    for (int e = 0; e < nEl; e++) {
+      for (int i = 0; i < eNoN; i++) {
+        tmpI(i,e) = d[iM].IEN(i,e) + nSh;
+      }
+    }
+
+    vtk_writer->set_connectivity(nsd, tmpI);
+    nSh = nSh + d[iM].nNo;
+  }
+
+  // Average Gauss point results over elements
+  auto lM = com_mod.msh[0];
+  Array<double> gr_int_cell(lM.gnEl, com_mod.nGrInt);
+  for (int e = 0; e < lM.gnEl; e++) {
+    for (int igr = 0; igr < com_mod.nGrInt; igr++) {
+      for (int g = 0; g < lM.nG; g++) {
+        gr_int_cell(e, igr) += com_mod.grInt(e, g, igr);
+      }
+      gr_int_cell(e, igr) /= lM.nG;
+    }
+  }
+
+  // Export to cell data
+  const std::string array_name = "gr_int";
+  vtk_writer->set_cell_data(array_name, gr_int_cell);
+
+  // Convert cell data to point data
+  vtk_writer->cell_to_point_data(array_name);
+  
+  // Apply smoothing to point data
+  vtk_writer->smooth_point_data(array_name);
+
+  // Extract point data
+  Array<double> gr_int_point = vtk_writer->get_point_data(array_name);
+
+  // Interpolate to Gauss points
+  com_mod.grInt = 0.0;
+
+  // Loop elements
+  for (int e = 0; e < lM.gnEl; e++) {
+    // Loop element nodes
+    for (int a = 0; a < lM.eNoN; a++) {
+      int Ac = lM.IEN(a, e);
+      // Loop Gauss points
+      for (int g = 0; g < lM.nG; g++) {
+        // Loop growth and remodeling internal parameters
+        for (int igr = 0; igr < com_mod.nGrInt; igr++) {
+          com_mod.grInt(e, g, igr) += gr_int_point(Ac, igr) * lM.N(a, g);
+        }
+      }
+    }
   }
 
   vtk_writer->write();
