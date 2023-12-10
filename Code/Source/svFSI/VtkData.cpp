@@ -32,6 +32,7 @@
 #include "VtkData.h"
 #include "Array.h"
 
+#include <vtkLogger.h>
 #include <vtkDoubleArray.h>
 #include "vtkCellData.h"
 #include <vtkGenericCell.h>
@@ -907,6 +908,8 @@ void VtkVtuData::cell_to_point_data(const std::string& data_name)
 
 void VtkVtuData::smooth_point_data(const std::string& data_name)
 {
+  vtkLogger::SetStderrVerbosity(vtkLogger::VERBOSITY_OFF);
+
   auto filter = vtkSmartPointer<vtkAttributeSmoothingFilter>::New();
   filter->SetInputData(impl->vtk_ugrid);
   filter->SetSmoothingStrategyToAllPoints();
